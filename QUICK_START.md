@@ -2,40 +2,15 @@
 
 ## Admin Panel Login
 
-**Default Admin Credentials:**
-- **Email:** `admin@transport.com`
-- **Password:** `admin123`
+There are no default admin credentials. Create an admin from the command line:
 
-### Creating Default Admin
+```bash
+cd backend
+node create-admin.js you@example.com "a-strong-password"
+```
 
-If the default admin doesn't exist, you need to create it first:
-
-1. **Start the backend server:**
-   ```bash
-   cd backend
-   npm run dev
-   ```
-
-2. **Create default admin** (choose one method):
-
-   **Method 1: Using curl**
-   ```bash
-   curl -X POST http://localhost:5000/api/auth/admin/create-default
-   ```
-
-   **Method 2: Using browser**
-   - Open: http://localhost:5000/api/auth/admin/create-default
-   - Change method to POST (use Postman or similar tool)
-
-   **Method 3: Using PowerShell (Windows)**
-   ```powershell
-   Invoke-WebRequest -Uri http://localhost:5000/api/auth/admin/create-default -Method POST
-   ```
-
-3. **Login to Admin Panel:**
-   - Go to http://localhost:3000
-   - Use email: `admin@transport.com`
-   - Use password: `admin123`
+Then go to http://localhost:3000 and log in with that email and password.
+Re-running the script with the same email resets the password. See `CREATE_ADMIN.md` for details.
 
 ## Driver Login
 
@@ -53,8 +28,6 @@ Drivers are created by the admin through the admin panel. To login as a driver:
 
 ## Important Notes
 
-- The default admin can only be created once
-- If you get "Default admin already exists", the admin is already created
-- Change the default password after first login (you'll need to add this feature or update it via database)
 - Driver passwords are set when creating the driver in the admin panel
-
+- Deactivated drivers are logged out on their next request
+- Logins are limited to 10 attempts per 15 minutes per email

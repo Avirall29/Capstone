@@ -80,13 +80,9 @@ See `SETUP.md` for detailed instructions.
 
 ## 🔑 Default Credentials
 
-**Admin:**
-- Email: `admin@transport.com`
-- Password: `admin123`
-
-Create this by running:
+**Admin:** create one from the backend folder (see `CREATE_ADMIN.md`):
 ```bash
-curl -X POST http://localhost:5000/api/auth/admin/create-default
+node create-admin.js you@example.com "a-strong-password"
 ```
 
 ## 📝 Next Steps

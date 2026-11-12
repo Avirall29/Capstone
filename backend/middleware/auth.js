@@ -37,7 +37,7 @@ export const authenticateDriver = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const driver = await Driver.findById(decoded.userId).select('-password');
 
-    if (!driver) {
+    if (!driver || !driver.isActive) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 

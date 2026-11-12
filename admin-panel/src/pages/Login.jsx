@@ -72,9 +72,6 @@ export default function Login({ setIsAuthenticated }) {
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Logging in...' : 'Login'}
             </Button>
-            <p className="text-xs text-center text-gray-500 mt-4">
-              Default: admin@transport.com / admin123
-            </p>
           </form>
         </CardContent>
       </Card>

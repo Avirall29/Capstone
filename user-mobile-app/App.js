@@ -121,7 +121,14 @@ export default function App() {
     socket.on('trip-ended', () => fetchBuses(selectedRoute, true));
     socket.on('breakdown-alert', () => fetchBuses(selectedRoute, true));
 
+    // The server forgets room subscriptions (and we may have missed trip events) while disconnected.
+    // Refetching buses re-runs the subscribe effect below.
+    const onReconnect = () => fetchBuses(selectedRoute, true);
+    socket.io.on('reconnect', onReconnect);
+
     return () => {
+      // socket.io (the Manager) is cached per URL and outlives this socket, so detach explicitly.
+      socket.io.off('reconnect', onReconnect);
       socket.close();
       socketRef.current = null;
     };

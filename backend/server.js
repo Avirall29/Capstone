@@ -13,17 +13,24 @@ import publicRoutes from './routes/public.js';
 
 dotenv.config();
 
+// Web origins allowed to call the API (comma-separated). Mobile apps send no Origin header, so CORS doesn't affect them.
+const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:3001')
+  .split(',')
+  .map((origin) => origin.trim());
+
 const app = express();
+// Behind Render's proxy: needed so req.ip is the real client (used by login rate limiting).
+app.set('trust proxy', 1);
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: "*",
+    origin: allowedOrigins,
     methods: ["GET", "POST"]
   }
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

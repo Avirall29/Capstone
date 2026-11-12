@@ -58,7 +58,14 @@ function App() {
       loadBuses(selectedRoute);
     });
 
+    // The server forgets room subscriptions (and we may have missed trip events) while disconnected.
+    // Reloading buses re-runs the subscribe effect below.
+    const onReconnect = () => loadBuses(selectedRoute);
+    socket.io.on('reconnect', onReconnect);
+
     return () => {
+      // socket.io (the Manager) is cached per URL and outlives this socket, so detach explicitly.
+      socket.io.off('reconnect', onReconnect);
       socket.close();
       socketRef.current = null;
     };

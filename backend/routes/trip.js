@@ -62,9 +62,9 @@ router.post('/start', authenticateDriver, [
       .populate('bus', 'busNumber plateNumber route')
       .populate('driver', 'name email phone');
 
-    // Emit WebSocket event
+    // Emit WebSocket event (broadcast to public clients too — ids only, no driver details)
     const io = req.app.get('io');
-    io.emit('trip-started', tripResponse);
+    io.emit('trip-started', { tripId: trip._id, busId: bus._id });
     io.to(`bus-${bus._id}`).emit('location-update', {
       busId: bus._id,
       location: bus.currentLocation
@@ -88,15 +88,13 @@ router.post('/:id/end', authenticateDriver, [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const trip = await Trip.findById(req.params.id)
-      .populate('bus')
-      .populate('driver');
+    const trip = await Trip.findById(req.params.id);
 
     if (!trip) {
       return res.status(404).json({ message: 'Trip not found' });
     }
 
-    if (trip.driver._id.toString() !== req.user._id.toString()) {
+    if (trip.driver.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
@@ -109,7 +107,7 @@ router.post('/:id/end', authenticateDriver, [
     trip.status = 'completed';
 
     // Update bus status
-    const bus = await Bus.findById(trip.bus._id);
+    const bus = await Bus.findById(trip.bus);
     if (bus) {
       bus.status = 'inactive';
       bus.currentLocation = {
@@ -128,7 +126,7 @@ router.post('/:id/end', authenticateDriver, [
 
     // Emit WebSocket event
     const io = req.app.get('io');
-    io.emit('trip-ended', tripResponse);
+    io.emit('trip-ended', { tripId: trip._id, busId: trip.bus });
 
     res.json(tripResponse);
   } catch (error) {
@@ -147,23 +145,26 @@ router.post('/:id/breakdown', authenticateDriver, [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const trip = await Trip.findById(req.params.id)
-      .populate('bus')
-      .populate('driver');
+    // Not populated: a populated driver would carry the password hash into the response and broadcast.
+    const trip = await Trip.findById(req.params.id);
 
     if (!trip) {
       return res.status(404).json({ message: 'Trip not found' });
     }
 
-    if (trip.driver._id.toString() !== req.user._id.toString()) {
+    if (trip.driver.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    if (trip.status !== 'active') {
+      return res.status(400).json({ message: 'Trip is not active' });
     }
 
     trip.breakdownReported = true;
     trip.breakdownReason = req.body.reason;
 
     // Update bus status
-    const bus = await Bus.findById(trip.bus._id);
+    const bus = await Bus.findById(trip.bus);
     if (bus) {
       bus.status = 'breakdown';
       await bus.save();
@@ -171,12 +172,11 @@ router.post('/:id/breakdown', authenticateDriver, [
 
     await trip.save();
 
-    // Emit WebSocket event
+    // Emit WebSocket event (broadcast to public clients too — no driver details)
     const io = req.app.get('io');
     io.emit('breakdown-alert', {
-      trip: trip,
-      bus: bus,
-      driver: trip.driver,
+      tripId: trip._id,
+      bus: bus && { _id: bus._id, busNumber: bus.busNumber },
       reason: req.body.reason
     });
 

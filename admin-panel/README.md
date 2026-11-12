@@ -16,9 +16,7 @@ npm run dev
 
 3. Open http://localhost:3000
 
-4. Login with default credentials:
-- Email: `admin@transport.com`
-- Password: `admin123`
+4. Login with the admin account created via `backend/create-admin.js` (see `../CREATE_ADMIN.md`).
 
 ## Build for Production
 

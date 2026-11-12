@@ -5,7 +5,6 @@ import { locationAPI } from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LOCATION_TASK_NAME = 'background-location-task';
-const FALLBACK_LOCATION = { lat: 28.6139, lng: 77.209 };
 
 // Define the background task
 TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
@@ -79,6 +78,10 @@ export const startLocationTracking = async () => {
   });
 };
 
+/** True when the background task is already sending updates (real devices with permission). */
+export const isBackgroundTracking = () =>
+  Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false);
+
 export const stopLocationTracking = async () => {
   try {
     await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
@@ -126,17 +129,25 @@ export const getCurrentLocation = async () => {
   };
 };
 
-/** Used while trip is active — never throws; uses cache, then GPS, then fallback. */
+const toUpdate = ({ coords }) => ({
+  lat: coords.latitude,
+  lng: coords.longitude,
+  speed: coords.speed || 0,
+  heading: coords.heading || 0,
+});
+
+/**
+ * Used while trip is active — never throws; uses a recent cached fix, then GPS.
+ * Returns null when no fix is available: never send a made-up position to the server.
+ */
 export const getLocationForUpdate = async () => {
   try {
     await ensureForegroundPermission();
 
-    const lastKnown = await Location.getLastKnownPositionAsync({ maxAge: 300000 });
+    // Short maxAge: this position is broadcast as the bus's live location.
+    const lastKnown = await Location.getLastKnownPositionAsync({ maxAge: 30000 });
     if (lastKnown?.coords) {
-      return {
-        lat: lastKnown.coords.latitude,
-        lng: lastKnown.coords.longitude,
-      };
+      return toUpdate(lastKnown);
     }
 
     const location = await Promise.race([
@@ -146,12 +157,9 @@ export const getLocationForUpdate = async () => {
       }),
     ]);
 
-    return {
-      lat: location.coords.latitude,
-      lng: location.coords.longitude,
-    };
+    return toUpdate(location);
   } catch {
-    return FALLBACK_LOCATION;
+    return null;
   }
 };
 

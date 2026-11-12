@@ -101,17 +101,10 @@ net start MongoDB
 mongod
 ```
 
-5. Create default admin account (optional):
+5. Create an admin account (see `CREATE_ADMIN.md`):
 ```bash
-# Start the server first, then make a POST request to:
-# http://localhost:5000/api/auth/admin/create-default
-# Or use curl:
-curl -X POST http://localhost:5000/api/auth/admin/create-default
+node create-admin.js you@example.com "a-strong-password"
 ```
-
-Default admin credentials:
-- Email: `admin@transport.com`
-- Password: `admin123`
 
 6. Start the backend server:
 ```bash
@@ -146,9 +139,7 @@ npm run dev
 
 The admin panel will run on `http://localhost:3000`
 
-5. Login with default credentials:
-- Email: `admin@transport.com`
-- Password: `admin123`
+5. Login with the admin account you created with `create-admin.js`.
 
 ### 3. Driver App Setup
 
@@ -238,7 +229,6 @@ The user app will run on `http://localhost:3001`
 ### Authentication
 - `POST /api/auth/admin/login` - Admin login
 - `POST /api/auth/driver/login` - Driver login
-- `POST /api/auth/admin/create-default` - Create default admin
 
 ### Buses
 - `GET /api/buses` - Get all buses
@@ -295,6 +285,8 @@ PORT=5000
 MONGODB_URI=mongodb://localhost:27017/transport_tracking
 JWT_SECRET=your_super_secret_jwt_key
 NODE_ENV=development
+# Web origins allowed to call the API (comma-separated). Defaults to http://localhost:3000,http://localhost:3001
+CORS_ORIGINS=https://admin-panel-eight-sooty.vercel.app,http://localhost:3000,http://localhost:3001
 ```
 
 ### Admin Panel (.env)

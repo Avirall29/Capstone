@@ -20,9 +20,9 @@ cp .env.example .env
 npm run dev
 ```
 
-Create default admin:
+Create an admin (see `CREATE_ADMIN.md`):
 ```bash
-curl -X POST http://localhost:5000/api/auth/admin/create-default
+node create-admin.js you@example.com "a-strong-password"
 ```
 
 ## Step 3: Setup Admin Panel
@@ -33,9 +33,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000 and login with:
-- Email: `admin@transport.com`
-- Password: `admin123`
+Open http://localhost:3000 and login with the admin account you created.
 
 ## Step 4: Setup Driver App
 

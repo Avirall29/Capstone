@@ -7,6 +7,8 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
+  Modal,
+  TextInput,
 } from 'react-native';
 import DriverMap from '../components/DriverMap';
 import { tripAPI } from '../utils/api';
@@ -16,6 +18,7 @@ import {
   stopLocationTracking,
   getCurrentLocation,
   getLocationForUpdate,
+  isBackgroundTracking,
 } from '../utils/location';
 import { locationAPI } from '../utils/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -27,6 +30,8 @@ export default function HomeScreen({ setIsAuthenticated, navigation }) {
   const [locationTracking, setLocationTracking] = useState(false);
   const [currentLocation, setCurrentLocation] = useState(null);
   const [user, setUser] = useState(null);
+  const [breakdownVisible, setBreakdownVisible] = useState(false);
+  const [breakdownReason, setBreakdownReason] = useState('');
   const locationIntervalRef = useRef(null);
   const activeTripRef = useRef(null);
   const locationBusyRef = useRef(false);
@@ -108,7 +113,11 @@ export default function HomeScreen({ setIsAuthenticated, navigation }) {
       await AsyncStorage.setItem('activeTripId', response.data._id);
       setCurrentLocation(location);
       setLocationTracking(true);
-      await startLocationTracking();
+      // Best-effort: if background permission is denied, the foreground interval still sends updates.
+      // (Previously a denial here showed "Failed to start trip" even though the trip had started.)
+      await startLocationTracking().catch((err) =>
+        console.warn('Background tracking unavailable:', err?.message)
+      );
 
       Alert.alert('Success', 'Trip started successfully');
     } catch (error) {
@@ -156,33 +165,27 @@ export default function HomeScreen({ setIsAuthenticated, navigation }) {
     );
   };
 
+  // Modal instead of Alert.prompt, which only exists on iOS.
   const handleReportBreakdown = () => {
     if (!activeTrip) return;
+    setBreakdownVisible(true);
+  };
 
-    Alert.prompt(
-      'Report Breakdown',
-      'Please describe the issue:',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Report',
-          onPress: async (reason) => {
-            if (!reason) {
-              Alert.alert('Error', 'Please provide a reason');
-              return;
-            }
+  const submitBreakdown = async () => {
+    const reason = breakdownReason.trim();
+    if (!reason) {
+      Alert.alert('Error', 'Please provide a reason');
+      return;
+    }
 
-            try {
-              await tripAPI.reportBreakdown(activeTrip._id, reason);
-              Alert.alert('Success', 'Breakdown reported successfully');
-            } catch (error) {
-              Alert.alert('Error', error.response?.data?.message || 'Failed to report breakdown');
-            }
-          },
-        },
-      ],
-      'plain-text'
-    );
+    try {
+      await tripAPI.reportBreakdown(activeTrip._id, reason);
+      setBreakdownVisible(false);
+      setBreakdownReason('');
+      Alert.alert('Success', 'Breakdown reported successfully');
+    } catch (error) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to report breakdown');
+    }
   };
 
   const sendLocationTick = async () => {
@@ -192,8 +195,16 @@ export default function HomeScreen({ setIsAuthenticated, navigation }) {
     locationBusyRef.current = true;
     try {
       const location = await getLocationForUpdate();
+      if (!location) return; // no GPS fix: skip this tick rather than send a fake position
       setCurrentLocation(location);
-      await locationAPI.send(location, trip._id, 0, 0);
+      // On real devices the background task already sends updates; avoid double-sending.
+      if (await isBackgroundTracking()) return;
+      await locationAPI.send(
+        { lat: location.lat, lng: location.lng },
+        trip._id,
+        location.speed,
+        location.heading
+      );
     } catch (error) {
       if (error?.response?.status === 401) {
         await AsyncStorage.removeItem('activeTripId');
@@ -344,6 +355,41 @@ export default function HomeScreen({ setIsAuthenticated, navigation }) {
           )}
         </View>
       </ScrollView>
+
+      <Modal
+        visible={breakdownVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setBreakdownVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.tripInfoTitle}>Report Breakdown</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Please describe the issue"
+              value={breakdownReason}
+              onChangeText={setBreakdownReason}
+              multiline
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.modalButton, styles.cancelButton]}
+                onPress={() => setBreakdownVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.modalButton, styles.breakdownButton]}
+                onPress={submitBreakdown}
+              >
+                <Text style={styles.actionButtonText}>Report</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -452,6 +498,42 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    minHeight: 80,
+    textAlignVertical: 'top',
+    fontSize: 16,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 15,
+  },
+  modalButton: {
+    flex: 1,
+  },
+  cancelButton: {
+    backgroundColor: '#e5e5e5',
+  },
+  cancelButtonText: {
+    color: '#333',
     fontSize: 16,
     fontWeight: '600',
   },

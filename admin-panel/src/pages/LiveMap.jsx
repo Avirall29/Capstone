@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
-import { busAPI, tripAPI } from '../lib/api';
+import { busAPI, tripAPI, SOCKET_URL } from '../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { io } from 'socket.io-client';
 import L from 'leaflet';
@@ -18,21 +18,22 @@ export default function LiveMap() {
   const [buses, setBuses] = useState([]);
   const [activeTrips, setActiveTrips] = useState([]);
   const [selectedBus, setSelectedBus] = useState(null);
-  const [socket, setSocket] = useState(null);
+  // A ref, not state: fetchActiveBuses is captured by the socket handlers below, and state would stay null there.
+  const socketRef = useRef(null);
   const mapRef = useRef(null);
 
   useEffect(() => {
+    // Initialize Socket.IO connection
+    const newSocket = io(SOCKET_URL, {
+      transports: ['websocket'],
+    });
+    socketRef.current = newSocket;
+
     fetchActiveBuses();
     fetchActiveTrips();
 
-    // Initialize Socket.IO connection
-    const newSocket = io('http://localhost:5000', {
-      transports: ['websocket'],
-    });
-
-    newSocket.on('connect', () => {
-      console.log('Connected to WebSocket server');
-    });
+    // Server-side room membership is lost on reconnect, so re-subscribe every time we connect.
+    newSocket.on('connect', fetchActiveBuses);
 
     newSocket.on('location-update', (data) => {
       setBuses((prevBuses) =>
@@ -62,15 +63,14 @@ export default function LiveMap() {
     });
 
     newSocket.on('breakdown-alert', (data) => {
-      alert(`Breakdown Alert: ${data.bus.busNumber} - ${data.reason}`);
+      alert(`Breakdown Alert: ${data.bus?.busNumber ?? 'Unknown bus'} - ${data.reason}`);
       fetchActiveBuses();
       fetchActiveTrips();
     });
 
-    setSocket(newSocket);
-
     return () => {
       newSocket.close();
+      socketRef.current = null;
     };
   }, []);
 
@@ -78,12 +78,10 @@ export default function LiveMap() {
     try {
       const response = await busAPI.getActive();
       setBuses(response.data);
-      
-      // Subscribe to location updates for all active buses
+
+      // Subscribe to location updates for all active buses (emits are buffered until connected)
       response.data.forEach((bus) => {
-        if (socket) {
-          socket.emit('subscribe', bus._id);
-        }
+        socketRef.current?.emit('subscribe', bus._id);
       });
     } catch (error) {
       console.error('Error fetching active buses:', error);

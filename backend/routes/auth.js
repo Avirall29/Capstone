@@ -8,8 +8,26 @@ import { authenticateUser } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Login brute-force guard: max 10 attempts per IP+email per 15-minute window.
+// Keyed on IP+email (not IP alone) so many users behind one mobile-carrier NAT don't block each other.
+// ponytail: in-memory, per server instance; move to a Redis store when running more than one instance.
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 10;
+const loginAttempts = new Map();
+setInterval(() => loginAttempts.clear(), LOGIN_WINDOW_MS).unref();
+
+const loginLimiter = (req, res, next) => {
+  const key = `${req.ip}|${String(req.body?.email || '').toLowerCase()}`;
+  const attempts = (loginAttempts.get(key) || 0) + 1;
+  loginAttempts.set(key, attempts);
+  if (attempts > LOGIN_MAX_ATTEMPTS) {
+    return res.status(429).json({ message: 'Too many login attempts. Try again in 15 minutes.' });
+  }
+  next();
+};
+
 // Admin Login
-router.post('/admin/login', [
+router.post('/admin/login', loginLimiter, [
   body('email').isEmail().normalizeEmail(),
   body('password').notEmpty()
 ], async (req, res) => {
@@ -53,7 +71,7 @@ router.post('/admin/login', [
 });
 
 // Driver Login
-router.post('/driver/login', [
+router.post('/driver/login', loginLimiter, [
   body('email').isEmail().normalizeEmail(),
   body('password').notEmpty()
 ], async (req, res) => {
@@ -153,7 +171,7 @@ router.post('/user/register', [
 });
 
 // User Login
-router.post('/user/login', [
+router.post('/user/login', loginLimiter, [
   body('email').isEmail().normalizeEmail(),
   body('password').notEmpty()
 ], async (req, res) => {
@@ -212,29 +230,6 @@ router.get('/user/me', authenticateUser, async (req, res) => {
       role: req.user.role
     }
   });
-});
-
-// Create default admin (for initial setup)
-router.post('/admin/create-default', async (req, res) => {
-  try {
-    const adminCount = await Admin.countDocuments();
-    if (adminCount > 0) {
-      return res.status(403).json({ message: 'Default admin already exists' });
-    }
-
-    const admin = new Admin({
-      username: 'admin',
-      email: 'admin@transport.com',
-      password: 'admin123'
-    });
-
-    await admin.save();
-
-    res.json({ message: 'Default admin created successfully', email: 'admin@transport.com', password: 'admin123' });
-  } catch (error) {
-    console.error('Create default admin error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
 });
 
 export default router;
