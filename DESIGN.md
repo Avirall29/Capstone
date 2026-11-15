@@ -160,6 +160,8 @@ One ink, cool paper, five ticket stocks and one emergency red.
 **Body Font:** Anek Latin, normal width, weights 400–700
 **Indic scripts:** Anek Devanagari, Anek Gurmukhi, Anek Bangla, Anek Tamil, Anek Telugu, Anek Kannada, Anek Malayalam, Anek Odia, Anek Gujarati (same family, same voice; system Noto as fallback)
 
+**Mobile note:** the Expo apps bundle static weights (Latin, Devanagari, Gurmukhi at 400/600/700/800); the condensed width axis is web-only, so mobile Display numbers use ExtraBold with tight tracking (−1.5).
+
 **Character:** A single multi-script family from an Indian foundry. Condensed and heavy for the printed numbers of a ticket (route, minutes, serials); open and plain for reading.
 
 ### Hierarchy

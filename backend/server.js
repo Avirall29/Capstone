@@ -23,10 +23,11 @@ import * as liveTracker from './services/liveTracker.js';
 
 dotenv.config();
 
-// Web origins allowed to call the API (comma-separated). Mobile apps send no Origin header, so CORS doesn't affect them.
-const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:3001,http://localhost:8081')
-  .split(',')
-  .map((origin) => origin.trim());
+// Web origins allowed to call the API (comma-separated CORS_ORIGINS). Mobile apps send no Origin header,
+// so CORS doesn't affect them. Without CORS_ORIGINS (local development) any http://localhost:<port> is allowed.
+const allowedOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim())
+  : [/^http:\/\/(localhost|127\.0\.0\.1):\d+$/];
 
 const app = express();
 // Behind Render's proxy: needed so req.ip is the real client (used by rate limiting).

@@ -6,7 +6,6 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 const mongo = await MongoMemoryServer.create();
 process.env.MONGODB_URI = mongo.getUri('transit');
 process.env.JWT_SECRET ||= 'demo-secret-change-me';
-process.env.CORS_ORIGINS ||= 'http://localhost:3000,http://localhost:3001,http://localhost:8081,http://localhost:19006';
 
 const { ready } = await import('../server.js');
 await ready;
