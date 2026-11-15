@@ -6,11 +6,11 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import Screen from '../components/Screen';
-import T from '../components/T';
-import { Button, Field, StageStrip, Banner } from '../components/ui';
+import Screen from 'transit-shared/native/Screen';
+import T from 'transit-shared/native/T';
+import { Button, Field, StageStrip, Banner } from 'transit-shared/native/ui';
 import { useAuth } from '../lib/auth';
-import { useTheme, stocks } from '../lib/theme';
+import { useTheme, stocks } from 'transit-shared/native/theme';
 import { errorText } from '../lib/api';
 
 const STEPS = ['personal', 'licence', 'documents', 'review'];

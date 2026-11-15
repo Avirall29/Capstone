@@ -81,6 +81,20 @@ export function pointAtDistance(index, along) {
   return { lat: a.lat + (b.lat - a.lat) * t, lng: a.lng + (b.lng - a.lng) * t };
 }
 
+/** The part of a path between two points (e.g. boarding and alighting stops), as [[lng, lat], ...]. */
+export function slicePath(coordinates, from, to) {
+  const index = buildPathIndex(coordinates);
+  if (!index) return [];
+  const a = projectOntoPath(index, from);
+  const b = projectOntoPath(index, to, a.along);
+  if (b.along <= a.along) return [[from.lng, from.lat], [to.lng, to.lat]];
+  const out = [[pointAtDistance(index, a.along).lng, pointAtDistance(index, a.along).lat]];
+  for (let i = a.segment + 1; i <= b.segment; i++) out.push([index.points[i].lng, index.points[i].lat]);
+  const end = pointAtDistance(index, b.along);
+  out.push([end.lng, end.lat]);
+  return out;
+}
+
 /** Shortest distance (meters) from a point to a path. */
 export function distanceToPath(index, point) {
   return projectOntoPath(index, point)?.offset ?? Infinity;

@@ -4,12 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { LANGUAGES } from 'transit-shared/i18n/languages.js';
-import Screen from '../components/Screen';
-import T from '../components/T';
-import { Button } from '../components/ui';
-import { setLanguage } from '../lib/i18n';
+import Screen from 'transit-shared/native/Screen';
+import T from 'transit-shared/native/T';
+import { Button } from 'transit-shared/native/ui';
+import { setLanguage } from 'transit-shared/native/i18n';
 import { useAuth } from '../lib/auth';
-import { useTheme } from '../lib/theme';
+import { useTheme } from 'transit-shared/native/theme';
 
 export default function Settings() {
   const { t, i18n } = useTranslation();

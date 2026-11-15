@@ -3,12 +3,12 @@ import { Pressable, View } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
-import Screen from '../components/Screen';
-import Logo from '../components/Logo';
-import T from '../components/T';
-import { Button, Field, Banner } from '../components/ui';
+import Screen from 'transit-shared/native/Screen';
+import Logo from 'transit-shared/native/Logo';
+import T from 'transit-shared/native/T';
+import { Button, Field, Banner } from 'transit-shared/native/ui';
 import { useAuth } from '../lib/auth';
-import { useTheme } from '../lib/theme';
+import { useTheme } from 'transit-shared/native/theme';
 import { errorText } from '../lib/api';
 
 export default function Login() {

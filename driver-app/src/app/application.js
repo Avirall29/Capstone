@@ -3,13 +3,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
-import Screen from '../components/Screen';
-import Logo from '../components/Logo';
-import T from '../components/T';
-import { Button, Stamp, Ticket, Banner } from '../components/ui';
+import Screen from 'transit-shared/native/Screen';
+import Logo from 'transit-shared/native/Logo';
+import T from 'transit-shared/native/T';
+import { Button, Stamp, Ticket, Banner } from 'transit-shared/native/ui';
 import { api, APPLICANT_KEY, errorText } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { useTheme, stocks } from '../lib/theme';
+import { useTheme, stocks } from 'transit-shared/native/theme';
 
 const STAMP = { pending: 'pending', approved: 'approved', rejected: 'rejected' };
 

@@ -3,8 +3,8 @@ import { useRef, useState } from 'react';
 import { ActivityIndicator, Animated, PanResponder, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import T from './T';
-import { useTheme } from '../lib/theme';
+import T from 'transit-shared/native/T';
+import { useTheme } from 'transit-shared/native/theme';
 
 const KNOB = 56;
 

@@ -7,15 +7,15 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import T from '../components/T';
+import T from 'transit-shared/native/T';
 import RouteMap from '../components/RouteMap';
-import PanicButton from '../components/PanicButton';
-import PanicSheet from '../components/PanicSheet';
+import PanicButton from 'transit-shared/native/PanicButton';
+import PanicSheet from 'transit-shared/native/PanicSheet';
 import SlideToConfirm from '../components/SlideToConfirm';
-import Sheet from '../components/Sheet';
-import { Ticket, RouteBadge, StageStrip, Stamp, Banner, Button } from '../components/ui';
+import Sheet from 'transit-shared/native/Sheet';
+import { Ticket, RouteBadge, StageStrip, Stamp, Banner, Button } from 'transit-shared/native/ui';
 import { useAuth } from '../lib/auth';
-import { useTheme, routeStock } from '../lib/theme';
+import { useTheme, routeStock } from 'transit-shared/native/theme';
 import { api, errorText } from '../lib/api';
 import { setActiveTrip, startBackgroundTracking, stopBackgroundTracking, flushQueue, fromLocation } from '../lib/tracking';
 import { useDriverState, useWatchPosition, useTripLoop, useLocationWarnings, useReroute, useOnline, turnOnLocation } from '../lib/hooks';
@@ -284,7 +284,13 @@ export default function Home() {
       </ScrollView>
 
       <LocationOffOverlay visible={tripActive && !warnings.locationOn} count={warnings.count} escalated={warnings.escalated} onPanic={sendPanic} />
-      <PanicSheet incident={panic.incident} error={panic.error} onClose={() => setPanic({ incident: null, error: false })} />
+      <PanicSheet
+        incident={panic.incident}
+        error={panic.error}
+        onClose={() => setPanic({ incident: null, error: false })}
+        fetchStatus={(id) => api.get(`/incidents/${id}/status`).then((s) => s.status)}
+        sendDetails={(id, details) => api.patch(`/incidents/${id}/details`, details)}
+      />
       <Sheet visible={breakdownOpen} onClose={() => setBreakdownOpen(false)} title={t('driver.breakdownTitle')}>
         <TextInput
           value={breakdown}

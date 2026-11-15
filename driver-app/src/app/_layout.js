@@ -8,9 +8,9 @@ import { useFonts } from 'expo-font';
 import { AnekLatin_400Regular, AnekLatin_600SemiBold, AnekLatin_700Bold, AnekLatin_800ExtraBold } from '@expo-google-fonts/anek-latin';
 import { AnekDevanagari_400Regular, AnekDevanagari_600SemiBold, AnekDevanagari_700Bold, AnekDevanagari_800ExtraBold } from '@expo-google-fonts/anek-devanagari';
 import { AnekGurmukhi_400Regular, AnekGurmukhi_600SemiBold, AnekGurmukhi_700Bold, AnekGurmukhi_800ExtraBold } from '@expo-google-fonts/anek-gurmukhi';
-import { initI18n } from '../lib/i18n';
+import { initI18n } from 'transit-shared/native/i18n';
 import { AuthProvider, useAuth } from '../lib/auth';
-import { useTheme } from '../lib/theme';
+import { useTheme } from 'transit-shared/native/theme';
 import { setupNotifications } from '../lib/notifications';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
