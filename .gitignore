@@ -7,3 +7,12 @@ build/
 .expo/
 .DS_Store
 *.log
+# Signing keys / credentials
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+# Uploaded driver documents (local-storage fallback)
+backend/uploads/
