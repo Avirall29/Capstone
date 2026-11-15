@@ -1,0 +1,6 @@
+{
+  "name": "transit-shared",
+  "private": true,
+  "type": "module",
+  "description": "Dependency-free code shared by backend, admin panel, driver app and passenger app. Import by relative path."
+}
