@@ -10,6 +10,7 @@ import { verifyGoogleIdToken, isGoogleConfigured } from '../services/google.js';
 import { parseImageDataUrl, saveDocument } from '../services/storage.js';
 import { emitToAdmins } from '../services/realtime.js';
 import { isExpoPushToken } from '../services/push.js';
+import { getRoute } from '../services/liveTracker.js';
 
 const router = express.Router();
 
@@ -166,6 +167,22 @@ router.get('/driver/application', async (req, res) => {
   const driver = await Driver.findById(auth.userId);
   if (!driver) return res.status(404).json({ message: 'Application not found' });
   res.json(applicationJson(driver));
+});
+
+// The signed-in driver with their bus and its route (shown before a trip starts).
+router.get('/driver/me', authenticateDriver, async (req, res) => {
+  const driver = await req.user.populate('assignedBus', 'busNumber plateNumber capacity route');
+  const bus = driver.assignedBus;
+  const route = bus?.route ? await getRoute(bus.route) : null;
+  res.json({
+    user: driverJson(driver),
+    bus: bus ? { id: bus._id, busNumber: bus.busNumber, plateNumber: bus.plateNumber, capacity: bus.capacity } : null,
+    route: route && {
+      id: route.id, number: route.number, name: route.name, color: route.color, departures: route.departures,
+      stops: route.stops.map(({ id, name, lat, lng, offsetMinutes }) => ({ id, name, lat, lng, offsetMinutes })),
+      path: route.index ? route.index.points.map((p) => [p.lng, p.lat]) : []
+    }
+  });
 });
 
 router.post('/driver/push-token', authenticateDriver, [body('token').custom(isExpoPushToken)], validate, async (req, res) => {

@@ -1,360 +1,169 @@
-import { useState, useEffect } from 'react';
-import { busAPI, driverAPI } from '../lib/api';
-import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../components/ui/dialog';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/select';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { Plus, Pencil, Trash2, UserPlus } from 'lucide-react';
+import { busAPI, driverAPI, transitAPI, errorMessage } from '@/lib/api';
+import { useRealtimeEvents } from '@/lib/realtime';
+import { PageHeader } from '@/components/Layout';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, Field } from '@/components/ui/dialog';
+import { RouteBadge, Stamp, EmptyTicket, RuledLines, Serial, timeAgo } from '@/components/ticket';
+
+const STATUS = {
+  active: ['live', 'On trip'],
+  inactive: ['stale', 'Parked'],
+  maintenance: ['delayed', 'Maintenance'],
+  breakdown: ['breakdown', 'Breakdown']
+};
+const empty = { busNumber: '', plateNumber: '', capacity: 50, route: '', status: 'inactive' };
 
 export default function BusManagement() {
-  const [buses, setBuses] = useState([]);
+  const [buses, setBuses] = useState(null);
   const [drivers, setDrivers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
-  const [selectedBus, setSelectedBus] = useState(null);
-  const [formData, setFormData] = useState({
-    busNumber: '',
-    plateNumber: '',
-    capacity: '',
-    route: '',
-  });
+  const [routes, setRoutes] = useState([]);
+  const [editing, setEditing] = useState(null); // bus form state
+  const [assigning, setAssigning] = useState(null); // bus
+  const [driverId, setDriverId] = useState('');
+  const [busy, setBusy] = useState(false);
 
+  const load = () => busAPI.getAll().then((r) => setBuses(r.data)).catch((e) => { setBuses([]); toast.error(errorMessage(e)); });
   useEffect(() => {
-    fetchBuses();
-    fetchDrivers();
+    load();
+    driverAPI.getAll().then((r) => setDrivers(r.data)).catch(() => {});
+    transitAPI.routes().then((r) => setRoutes(r.data)).catch(() => {});
   }, []);
+  useRealtimeEvents((event) => { if (['trip-started', 'trip-ended', 'breakdown-alert'].includes(event)) load(); });
 
-  const fetchBuses = async () => {
+  const save = async () => {
+    setBusy(true);
     try {
-      const response = await busAPI.getAll();
-      setBuses(response.data);
-    } catch (error) {
-      console.error('Error fetching buses:', error);
+      const payload = { ...editing, capacity: Number(editing.capacity), route: editing.route || null };
+      if (editing._id) await busAPI.update(editing._id, payload);
+      else await busAPI.create(payload);
+      toast.success(`Bus ${editing.busNumber} saved`);
+      setEditing(null);
+      load();
+    } catch (e) {
+      toast.error(errorMessage(e));
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
-  const fetchDrivers = async () => {
+  const remove = async (bus) => {
+    if (!window.confirm(`Delete bus ${bus.busNumber}? Its driver will be unassigned.`)) return;
     try {
-      const response = await driverAPI.getAll();
-      setDrivers(response.data);
-    } catch (error) {
-      console.error('Error fetching drivers:', error);
+      await busAPI.delete(bus._id);
+      toast.success(`Bus ${bus.busNumber} deleted`);
+      load();
+    } catch (e) {
+      toast.error(errorMessage(e));
     }
   };
 
-  const handleOpenDialog = (bus = null) => {
-    setSelectedBus(bus);
-    if (bus) {
-      setFormData({
-        busNumber: bus.busNumber,
-        plateNumber: bus.plateNumber,
-        capacity: bus.capacity.toString(),
-        route: bus.route,
-      });
-    } else {
-      setFormData({
-        busNumber: '',
-        plateNumber: '',
-        capacity: '',
-        route: '',
-      });
-    }
-    setDialogOpen(true);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const assign = async () => {
+    setBusy(true);
     try {
-      if (selectedBus) {
-        await busAPI.update(selectedBus._id, {
-          ...formData,
-          capacity: parseInt(formData.capacity),
-        });
-      } else {
-        await busAPI.create({
-          ...formData,
-          capacity: parseInt(formData.capacity),
-        });
-      }
-      setDialogOpen(false);
-      fetchBuses();
-    } catch (error) {
-      console.error('Error saving bus:', error);
-      alert(error.response?.data?.message || 'Error saving bus');
+      await busAPI.assignDriver(assigning._id, driverId);
+      toast.success('Driver assigned');
+      setAssigning(null);
+      load();
+      driverAPI.getAll().then((r) => setDrivers(r.data));
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setBusy(false);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this bus?')) return;
-    try {
-      await busAPI.delete(id);
-      fetchBuses();
-    } catch (error) {
-      console.error('Error deleting bus:', error);
-      alert('Error deleting bus');
-    }
-  };
-
-  const handleAssignDriver = async (busId, driverId) => {
-    try {
-      await busAPI.assignDriver(busId, driverId);
-      fetchBuses();
-      setAssignDialogOpen(false);
-    } catch (error) {
-      console.error('Error assigning driver:', error);
-      alert(error.response?.data?.message || 'Error assigning driver');
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'inactive':
-        return 'bg-gray-100 text-gray-800';
-      case 'maintenance':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'breakdown':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  if (loading) {
-    return <div>Loading buses...</div>;
-  }
+  const formValid = editing && editing.busNumber.trim() && editing.plateNumber.trim() && Number(editing.capacity) > 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Bus Management</h1>
-          <p className="text-gray-600 mt-2">Manage your fleet of buses</p>
-        </div>
-        <Button onClick={() => handleOpenDialog()}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Bus
-        </Button>
-      </div>
+    <>
+      <PageHeader title="Buses" actions={<button type="button" className="btn btn-primary" onClick={() => setEditing({ ...empty })}><Plus size={18} /> Add bus</button>}>
+        The fleet, the route each bus runs, and who drives it.
+      </PageHeader>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Bus Number</TableHead>
-                <TableHead>Plate Number</TableHead>
-                <TableHead>Route</TableHead>
-                <TableHead>Capacity</TableHead>
-                <TableHead>Driver</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {buses.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-gray-500">
-                    No buses found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                buses.map((bus) => (
-                  <TableRow key={bus._id}>
-                    <TableCell className="font-medium">{bus.busNumber}</TableCell>
-                    <TableCell>{bus.plateNumber}</TableCell>
-                    <TableCell>{bus.route}</TableCell>
-                    <TableCell>{bus.capacity}</TableCell>
-                    <TableCell>
-                      {bus.assignedDriver ? (
-                        <span>{bus.assignedDriver.name}</span>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedBus(bus);
-                            setAssignDialogOpen(true);
-                          }}
-                        >
-                          Assign Driver
-                        </Button>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                          bus.status
-                        )}`}
-                      >
-                        {bus.status}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenDialog(bus)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(bus._id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-600" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Add/Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{selectedBus ? 'Edit Bus' : 'Add New Bus'}</DialogTitle>
-            <DialogDescription>
-              {selectedBus
-                ? 'Update bus information'
-                : 'Fill in the details to add a new bus'}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="busNumber">Bus Number</Label>
-                <Input
-                  id="busNumber"
-                  value={formData.busNumber}
-                  onChange={(e) =>
-                    setFormData({ ...formData, busNumber: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="plateNumber">Plate Number</Label>
-                <Input
-                  id="plateNumber"
-                  value={formData.plateNumber}
-                  onChange={(e) =>
-                    setFormData({ ...formData, plateNumber: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="capacity">Capacity</Label>
-                <Input
-                  id="capacity"
-                  type="number"
-                  min="1"
-                  value={formData.capacity}
-                  onChange={(e) =>
-                    setFormData({ ...formData, capacity: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="route">Route</Label>
-                <Input
-                  id="route"
-                  value={formData.route}
-                  onChange={(e) =>
-                    setFormData({ ...formData, route: e.target.value })
-                  }
-                  required
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit">Save</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Assign Driver Dialog */}
-      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Assign Driver to Bus</DialogTitle>
-            <DialogDescription>
-              Select a driver to assign to {selectedBus?.busNumber}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {drivers
-              .filter((d) => d.isActive)
-              .map((driver) => (
-                <div
-                  key={driver._id}
-                  className="flex items-center justify-between p-3 border rounded-md"
-                >
-                  <div>
-                    <p className="font-medium">{driver.name}</p>
-                    <p className="text-sm text-gray-600">{driver.email}</p>
-                  </div>
-                  <Button
-                    onClick={() => handleAssignDriver(selectedBus._id, driver._id)}
-                    disabled={driver.assignedBus !== null}
-                  >
-                    {driver.assignedBus ? 'Already Assigned' : 'Assign'}
-                  </Button>
-                </div>
+      {buses === null ? <RuledLines rows={8} /> : buses.length === 0 ? (
+        <EmptyTicket title="No buses yet" action={<button type="button" className="btn btn-primary" onClick={() => setEditing({ ...empty })}><Plus size={18} /> Add the first bus</button>}>
+          Add a bus, give it a route, then assign an approved driver.
+        </EmptyTicket>
+      ) : (
+        <div className="ticket overflow-x-auto">
+          <table className="waybill">
+            <thead>
+              <tr><th>Bus</th><th>Route</th><th>Driver</th><th>Status</th><th>Last position</th><th className="text-right">Seats</th><th><span className="sr-only">Actions</span></th></tr>
+            </thead>
+            <tbody>
+              {buses.map((bus) => (
+                <tr key={bus._id}>
+                  <td><div className="font-bold">Bus {bus.busNumber}</div><Serial>{bus.plateNumber}</Serial></td>
+                  <td>{bus.route ? <span className="flex items-center gap-2"><RouteBadge route={bus.route} size="sm" /><span className="text-[13.5px] text-ink-soft truncate max-w-[180px]">{bus.route.name}</span></span> : <span className="text-ink-faint">Not set</span>}</td>
+                  <td>{bus.assignedDriver ? <span>{bus.assignedDriver.name}</span> : (
+                    <button type="button" className="btn btn-sm btn-ghost -ml-3 text-ink-soft" onClick={() => { setAssigning(bus); setDriverId(''); }}><UserPlus size={15} /> Assign</button>
+                  )}</td>
+                  <td><Stamp kind={STATUS[bus.status][0]}>{STATUS[bus.status][1]}</Stamp></td>
+                  <td className="text-ink-soft text-[13.5px]">{bus.live ? `${timeAgo(bus.live.lastUpdate)}${bus.live.nextStop ? ` · next ${bus.live.nextStop.name}` : ''}` : bus.currentLocation?.timestamp ? timeAgo(bus.currentLocation.timestamp) : '—'}</td>
+                  <td className="text-right tabular-nums">{bus.capacity}</td>
+                  <td className="text-right whitespace-nowrap">
+                    {bus.assignedDriver && <button type="button" className="p-2 rounded-sm hover:bg-paper" title="Change driver" onClick={() => { setAssigning(bus); setDriverId(bus.assignedDriver._id); }}><UserPlus size={16} /></button>}
+                    <button type="button" className="p-2 rounded-sm hover:bg-paper" aria-label={`Edit bus ${bus.busNumber}`}
+                      onClick={() => setEditing({ _id: bus._id, busNumber: bus.busNumber, plateNumber: bus.plateNumber, capacity: bus.capacity, route: bus.route?._id || '', status: bus.status })}><Pencil size={16} /></button>
+                    <button type="button" className="p-2 rounded-sm text-ink-faint hover:text-signal hover:bg-signal-stock" aria-label={`Delete bus ${bus.busNumber}`} onClick={() => remove(bus)}><Trash2 size={16} /></button>
+                  </td>
+                </tr>
               ))}
-          </div>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Dialog open={Boolean(editing)} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{editing?._id ? `Edit bus ${editing.busNumber}` : 'Add a bus'}</DialogTitle></DialogHeader>
+          {editing && (
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Bus number"><input className="field" value={editing.busNumber} onChange={(e) => setEditing({ ...editing, busNumber: e.target.value })} autoFocus /></Field>
+              <Field label="Number plate"><input className="field uppercase" value={editing.plateNumber} onChange={(e) => setEditing({ ...editing, plateNumber: e.target.value.toUpperCase() })} placeholder="PB65-AK-1234" /></Field>
+              <Field label="Seats"><input type="number" min="1" className="field" value={editing.capacity} onChange={(e) => setEditing({ ...editing, capacity: e.target.value })} /></Field>
+              <Field label="Status">
+                <select className="field" value={editing.status} onChange={(e) => setEditing({ ...editing, status: e.target.value })}>
+                  {Object.entries(STATUS).map(([k, [, label]]) => <option key={k} value={k}>{label}</option>)}
+                </select>
+              </Field>
+              <Field label="Route" className="col-span-2" hint={routes.length === 0 ? 'Create routes in Routes & stops first.' : undefined}>
+                <select className="field" value={editing.route} onChange={(e) => setEditing({ ...editing, route: e.target.value })}>
+                  <option value="">No route</option>
+                  {routes.map((r) => <option key={r._id} value={r._id}>{r.number} — {r.name}</option>)}
+                </select>
+              </Field>
+            </div>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
-              Cancel
-            </Button>
+            <button type="button" className="btn btn-ghost" onClick={() => setEditing(null)}>Cancel</button>
+            <button type="button" className="btn btn-primary" disabled={busy || !formValid} onClick={save}>{busy ? 'Saving…' : 'Save bus'}</button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+
+      <Dialog open={Boolean(assigning)} onOpenChange={(o) => !o && setAssigning(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Driver for bus {assigning?.busNumber}</DialogTitle>
+            <DialogDescription>Only approved, active drivers are listed. A driver drives one bus at a time.</DialogDescription>
+          </DialogHeader>
+          <Field label="Driver">
+            <select className="field" value={driverId} onChange={(e) => setDriverId(e.target.value)}>
+              <option value="">Choose a driver</option>
+              {drivers.filter((d) => d.isActive).map((d) => (
+                <option key={d._id} value={d._id}>{d.name}{d.assignedBus ? ` (now on bus ${d.assignedBus.busNumber})` : ''}</option>
+              ))}
+            </select>
+          </Field>
+          <DialogFooter>
+            <button type="button" className="btn btn-ghost" onClick={() => setAssigning(null)}>Cancel</button>
+            <button type="button" className="btn btn-primary" disabled={busy || !driverId} onClick={assign}>Assign driver</button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
-

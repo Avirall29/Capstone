@@ -44,10 +44,10 @@ const every = (startHour, endHour, minutes) => {
 };
 
 const ROUTES = [
-  { number: '1', name: 'ISBT 43 – Sukhna Lake', color: '#0F766E', stops: ['isbt43', 'sec35', 'sec22', 'isbt17', 'matka', 'rockGarden', 'sukhna'], departures: every(6, 21, 20) },
-  { number: '2', name: 'Mohali – Railway Station', color: '#B45309', stops: ['mohali7', 'mohali3b2', 'isbt43', 'sec34', 'tribune', 'transport', 'elante', 'railway'], departures: every(6, 21, 30) },
-  { number: '3', name: 'PGI – Zirakpur', color: '#7C3AED', stops: ['pgi', 'pu', 'sec15', 'isbt17', 'tribune', 'hallomajra', 'zirakpur'], departures: every(6, 21, 30) },
-  { number: '4', name: 'Capitol Complex – ISBT 43', color: '#BE123C', stops: ['capitol', 'matka', 'isbt17', 'sec22', 'sec35', 'isbt43'], departures: every(7, 20, 40) }
+  { number: '1', name: 'ISBT 43 – Sukhna Lake', color: '#17633F', stops: ['isbt43', 'sec35', 'sec22', 'isbt17', 'matka', 'rockGarden', 'sukhna'], departures: every(6, 21, 20) },
+  { number: '2', name: 'Mohali – Railway Station', color: '#7A5600', stops: ['mohali7', 'mohali3b2', 'isbt43', 'sec34', 'tribune', 'transport', 'elante', 'railway'], departures: every(6, 21, 30) },
+  { number: '3', name: 'PGI – Zirakpur', color: '#5B3A9E', stops: ['pgi', 'pu', 'sec15', 'isbt17', 'tribune', 'hallomajra', 'zirakpur'], departures: every(6, 21, 30) },
+  { number: '4', name: 'Capitol Complex – ISBT 43', color: '#A3184A', stops: ['capitol', 'matka', 'isbt17', 'sec22', 'sec35', 'isbt43'], departures: every(7, 20, 40) }
 ];
 
 const BUSES = [

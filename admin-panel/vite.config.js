@@ -7,10 +7,13 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@shared': path.resolve(__dirname, '../shared'),
     },
   },
   server: {
     port: 3000,
+    // Allow importing ../shared (design tokens, incident reasons, geo helpers)
+    fs: { allow: [path.resolve(__dirname, '..')] },
     proxy: {
       '/api': {
         target: 'http://localhost:5000',
@@ -19,4 +22,3 @@ export default defineConfig({
     },
   },
 })
-

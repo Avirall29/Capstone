@@ -2,59 +2,292 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
-  }
-}
+/* Ticket Stock — see DESIGN.md */
 
 @layer base {
-  * {
-    @apply border-border;
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-paper text-ink font-sans;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  :focus-visible {
+    outline: 2px solid theme('colors.ink.DEFAULT');
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: theme('colors.mint');
   }
 }
 
+@layer components {
+  /* Numbers print: tabular, condensed, heavy */
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-variation-settings: 'wdth' 75;
+    font-weight: 800;
+    line-height: 0.9;
+  }
+  .condensed {
+    font-variation-settings: 'wdth' 75;
+  }
+  /* The serial line: the only tracked uppercase label in the system */
+  .serial {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1.2;
+  }
+
+  .ticket {
+    @apply bg-counterfoil border border-rule rounded-md shadow-rest;
+  }
+
+  /* Perforation with semicircular notches cut at both ends (vertical tear line) */
+  .perf-v {
+    position: relative;
+    width: 0;
+    border-left: 2px dotted theme('colors.rule');
+    align-self: stretch;
+  }
+  .perf-v::before,
+  .perf-v::after {
+    content: '';
+    position: absolute;
+    left: -11px;
+    width: 20px;
+    height: 10px;
+    background: var(--notch-bg, theme('colors.paper'));
+    border: 1px solid theme('colors.rule');
+  }
+  .perf-v::before {
+    top: -1px;
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+  }
+  .perf-v::after {
+    bottom: -1px;
+    border-bottom: none;
+    border-radius: 10px 10px 0 0;
+  }
+  .perf-h {
+    border-top: 2px dotted theme('colors.rule');
+  }
+
+  /* Punch hole: unpunched ring / punched (cut through) */
+  .hole {
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    border: 1.5px solid var(--hole-ring, theme('colors.rule'));
+    background: theme('colors.counterfoil');
+    flex: none;
+    position: relative;
+  }
+  .hole[data-punched='true'] {
+    background: var(--hole-bg, theme('colors.paper'));
+    border-color: var(--hole-ring, theme('colors.rule'));
+    box-shadow: inset 0 1px 2px rgba(22, 33, 62, 0.35);
+  }
+  .hole[data-next='true'] {
+    border: 2.5px solid theme('colors.ink.DEFAULT');
+  }
+
+  /* Rubber stamp */
+  .stamp {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 7px;
+    border: 2px solid currentColor;
+    border-radius: 4px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1.5;
+    transform: rotate(-3deg);
+    opacity: 0.88;
+    white-space: nowrap;
+  }
+  .stamp-land {
+    animation: stamp-land 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 h-12 px-5 rounded-md font-semibold text-[15px] transition-[background-color,transform,box-shadow] duration-150 ease-out select-none;
+  }
+  .btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+  .btn:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+  .btn-sm {
+    @apply h-9 px-3 text-sm;
+  }
+  .btn-primary {
+    @apply bg-ink text-counterfoil hover:bg-[#0f182f];
+  }
+  .btn-primary:focus-visible {
+    outline: 2px solid theme('colors.mint');
+    outline-offset: 2px;
+  }
+  .btn-secondary {
+    @apply bg-counterfoil text-ink border-[1.5px] border-ink hover:bg-paper;
+  }
+  .btn-ghost {
+    @apply text-ink hover:bg-ink/5;
+  }
+  .btn-danger {
+    @apply bg-signal text-counterfoil hover:bg-[#b51b29];
+  }
+
+  .field {
+    @apply w-full h-12 px-3.5 rounded-md bg-counterfoil border-[1.5px] border-rule text-ink placeholder:text-ink-faint transition-[border-color,box-shadow] duration-150;
+  }
+  .field:focus {
+    @apply outline-none border-ink;
+    box-shadow: 0 0 0 3px theme('colors.mint');
+  }
+  .field[aria-invalid='true'] {
+    @apply border-signal;
+  }
+  textarea.field {
+    @apply h-auto py-3;
+  }
+
+  /* Waybill table */
+  .waybill {
+    @apply w-full border-collapse text-[14.5px];
+  }
+  .waybill thead th {
+    @apply serial text-ink-faint text-left font-semibold px-4 py-3 border-b-2 border-ink bg-counterfoil sticky top-0 z-[1];
+  }
+  .waybill tbody td {
+    @apply px-4 py-3 border-b border-rule align-middle;
+  }
+  .waybill tbody tr {
+    @apply transition-colors duration-150;
+  }
+  .waybill tbody tr:hover {
+    @apply bg-paper/70;
+  }
+}
+
+@keyframes stamp-land {
+  from {
+    transform: scale(1.25) rotate(-8deg);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) rotate(-3deg);
+    opacity: 0.88;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 12px)) scale(0.98);
+  }
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.rise-in {
+  animation: rise-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes punch-chad {
+  0% {
+    transform: translate(0, 0) rotate(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(4px, 16px) rotate(120deg);
+    opacity: 0;
+  }
+}
+
+@keyframes alert-lit {
+  0%,
+  100% {
+    background-color: theme('colors.signal.stock');
+  }
+  50% {
+    background-color: #fdeaec;
+  }
+}
+.alert-lit {
+  animation: alert-lit 1.6s ease-in-out infinite;
+}
+
+/* Map markers */
+.bus-marker {
+  display: grid;
+  place-items: center;
+  min-width: 34px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: theme('colors.ink.DEFAULT');
+  color: theme('colors.counterfoil');
+  font-weight: 800;
+  font-size: 14px;
+  font-variation-settings: 'wdth' 75;
+  font-variant-numeric: tabular-nums;
+  border: 2px solid var(--stock, theme('colors.mint'));
+  box-shadow: 0 4px 10px -4px rgba(22, 33, 62, 0.5);
+  cursor: pointer;
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.bus-marker:hover,
+.bus-marker[data-selected='true'] {
+  transform: scale(1.15);
+}
+.bus-marker[data-alert='true'] {
+  background: theme('colors.signal.DEFAULT');
+}
+.bus-marker[data-stale='true'] {
+  opacity: 0.55;
+}
+.incident-marker {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: theme('colors.signal.DEFAULT');
+  border: 3px solid theme('colors.counterfoil');
+  box-shadow: 0 0 0 0 rgba(208, 32, 47, 0.6);
+  animation: incident-pulse 1.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+@keyframes incident-pulse {
+  to {
+    box-shadow: 0 0 0 16px rgba(208, 32, 47, 0);
+  }
+}
+.maplibregl-ctrl-attrib {
+  font-size: 11px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}

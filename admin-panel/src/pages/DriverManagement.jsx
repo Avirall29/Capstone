@@ -1,289 +1,124 @@
-import { useState, useEffect } from 'react';
-import { driverAPI } from '../lib/api';
-import { Button } from '../components/ui/button';
-import { Card, CardContent } from '../components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../components/ui/dialog';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { driverAPI, errorMessage } from '@/lib/api';
+import { useRealtime } from '@/lib/realtime';
+import { PageHeader } from '@/components/Layout';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, Field } from '@/components/ui/dialog';
+import { Stamp, EmptyTicket, RuledLines, Serial } from '@/components/ticket';
+
+const empty = { name: '', email: '', phone: '', licenseNumber: '', password: '' };
 
 export default function DriverManagement() {
-  const [drivers, setDrivers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedDriver, setSelectedDriver] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    licenseNumber: '',
-    password: '',
-  });
+  const [drivers, setDrivers] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const { summary } = useRealtime();
 
-  useEffect(() => {
-    fetchDrivers();
-  }, []);
+  const load = () => driverAPI.getAll().then((r) => setDrivers(r.data)).catch((e) => { setDrivers([]); toast.error(errorMessage(e)); });
+  useEffect(() => { load(); }, []);
 
-  const fetchDrivers = async () => {
+  const save = async () => {
+    setBusy(true);
     try {
-      const response = await driverAPI.getAll();
-      setDrivers(response.data);
-    } catch (error) {
-      console.error('Error fetching drivers:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOpenDialog = (driver = null) => {
-    setSelectedDriver(driver);
-    if (driver) {
-      setFormData({
-        name: driver.name,
-        email: driver.email,
-        phone: driver.phone,
-        licenseNumber: driver.licenseNumber,
-        password: '',
-      });
-    } else {
-      setFormData({
-        name: '',
-        email: '',
-        phone: '',
-        licenseNumber: '',
-        password: '',
-      });
-    }
-    setDialogOpen(true);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      if (selectedDriver) {
-        const updateData = { ...formData };
-        if (!updateData.password) {
-          delete updateData.password;
-        }
-        await driverAPI.update(selectedDriver._id, updateData);
+      if (editing._id) {
+        const { password, ...rest } = editing;
+        await driverAPI.update(editing._id, rest);
       } else {
-        await driverAPI.create(formData);
+        await driverAPI.create(editing);
       }
-      setDialogOpen(false);
-      fetchDrivers();
-    } catch (error) {
-      console.error('Error saving driver:', error);
-      alert(error.response?.data?.message || 'Error saving driver');
+      toast.success(`${editing.name} saved`);
+      setEditing(null);
+      load();
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setBusy(false);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this driver?')) return;
+  const toggleActive = async (d) => {
     try {
-      await driverAPI.delete(id);
-      fetchDrivers();
-    } catch (error) {
-      console.error('Error deleting driver:', error);
-      alert('Error deleting driver');
+      await driverAPI.update(d._id, { isActive: !d.isActive });
+      toast.success(d.isActive ? `${d.name} suspended — signed out of the driver app` : `${d.name} reactivated`);
+      load();
+    } catch (e) {
+      toast.error(errorMessage(e));
     }
   };
 
-  if (loading) {
-    return <div>Loading drivers...</div>;
-  }
+  const remove = async (d) => {
+    if (!window.confirm(`Delete ${d.name}? Their bus will be unassigned.`)) return;
+    try {
+      await driverAPI.delete(d._id);
+      toast.success(`${d.name} deleted`);
+      load();
+    } catch (e) {
+      toast.error(errorMessage(e));
+    }
+  };
+
+  const valid = editing && editing.name.trim() && /\S+@\S+\.\S+/.test(editing.email) && editing.phone.trim() && editing.licenseNumber.trim() && (editing._id || editing.password.length >= 6);
+  const pending = summary?.pendingApplications || 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Driver Management</h1>
-          <p className="text-gray-600 mt-2">Manage your drivers</p>
+    <>
+      <PageHeader title="Drivers" actions={<button type="button" className="btn btn-primary" onClick={() => setEditing({ ...empty })}><Plus size={18} /> Add driver</button>}>
+        Approved drivers. New drivers usually register themselves in the driver app{pending > 0 && <> — <Link to="/applications" className="underline underline-offset-2 font-semibold">{pending} waiting for review</Link></>}.
+      </PageHeader>
+
+      {drivers === null ? <RuledLines rows={8} /> : drivers.length === 0 ? (
+        <EmptyTicket title="No approved drivers yet">Approve applications from the driver app, or add a driver directly.</EmptyTicket>
+      ) : (
+        <div className="ticket overflow-x-auto">
+          <table className="waybill">
+            <thead><tr><th>Driver</th><th>Phone</th><th>Licence</th><th>Bus</th><th>Account</th><th><span className="sr-only">Actions</span></th></tr></thead>
+            <tbody>
+              {drivers.map((d) => (
+                <tr key={d._id} className={d.isActive ? '' : 'opacity-60'}>
+                  <td><div className="font-semibold">{d.name}</div><div className="text-[13px] text-ink-soft">{d.email}</div></td>
+                  <td className="tabular-nums whitespace-nowrap">{d.phone}</td>
+                  <td><Serial className="text-ink">{d.licenseNumber}</Serial></td>
+                  <td>{d.assignedBus ? <span className="font-semibold">Bus {d.assignedBus.busNumber}</span> : <span className="text-ink-faint">Unassigned</span>}</td>
+                  <td>
+                    <button type="button" onClick={() => toggleActive(d)} title={d.isActive ? 'Suspend' : 'Reactivate'}>
+                      <Stamp kind={d.isActive ? 'approved' : 'rejected'}>{d.isActive ? 'Active' : 'Suspended'}</Stamp>
+                    </button>
+                  </td>
+                  <td className="text-right whitespace-nowrap">
+                    <button type="button" className="p-2 rounded-sm hover:bg-paper" aria-label={`Edit ${d.name}`}
+                      onClick={() => setEditing({ _id: d._id, name: d.name, email: d.email, phone: d.phone, licenseNumber: d.licenseNumber, password: '' })}><Pencil size={16} /></button>
+                    <button type="button" className="p-2 rounded-sm text-ink-faint hover:text-signal hover:bg-signal-stock" aria-label={`Delete ${d.name}`} onClick={() => remove(d)}><Trash2 size={16} /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        <Button onClick={() => handleOpenDialog()}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Driver
-        </Button>
-      </div>
+      )}
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>License Number</TableHead>
-                <TableHead>Assigned Bus</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {drivers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-gray-500">
-                    No drivers found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                drivers.map((driver) => (
-                  <TableRow key={driver._id}>
-                    <TableCell className="font-medium">{driver.name}</TableCell>
-                    <TableCell>{driver.email}</TableCell>
-                    <TableCell>{driver.phone}</TableCell>
-                    <TableCell>{driver.licenseNumber}</TableCell>
-                    <TableCell>
-                      {driver.assignedBus ? (
-                        <span>
-                          {driver.assignedBus.busNumber} - {driver.assignedBus.route}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">Not assigned</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          driver.isActive
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {driver.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenDialog(driver)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(driver._id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-600" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Add/Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={Boolean(editing)} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {selectedDriver ? 'Edit Driver' : 'Add New Driver'}
-            </DialogTitle>
-            <DialogDescription>
-              {selectedDriver
-                ? 'Update driver information'
-                : 'Fill in the details to add a new driver'}
-            </DialogDescription>
+            <DialogTitle>{editing?._id ? `Edit ${editing.name}` : 'Add a driver'}</DialogTitle>
+            {!editing?._id && <DialogDescription>Drivers added here are approved immediately. Share the email and password with them privately.</DialogDescription>}
           </DialogHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="licenseNumber">License Number</Label>
-                <Input
-                  id="licenseNumber"
-                  value={formData.licenseNumber}
-                  onChange={(e) =>
-                    setFormData({ ...formData, licenseNumber: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">
-                  Password {selectedDriver && '(leave empty to keep current)'}
-                </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  required={!selectedDriver}
-                  minLength={6}
-                />
-              </div>
+          {editing && (
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Full name" className="col-span-2"><input className="field" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} autoFocus /></Field>
+              <Field label="Email"><input type="email" className="field" value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })} /></Field>
+              <Field label="Phone"><input type="tel" className="field" value={editing.phone} onChange={(e) => setEditing({ ...editing, phone: e.target.value })} /></Field>
+              <Field label="Driving licence number" className={editing._id ? 'col-span-2' : ''}><input className="field uppercase" value={editing.licenseNumber} onChange={(e) => setEditing({ ...editing, licenseNumber: e.target.value.toUpperCase() })} /></Field>
+              {!editing._id && <Field label="Password" hint="At least 6 characters"><input type="password" className="field" value={editing.password} onChange={(e) => setEditing({ ...editing, password: e.target.value })} /></Field>}
             </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit">Save</Button>
-            </DialogFooter>
-          </form>
+          )}
+          <DialogFooter>
+            <button type="button" className="btn btn-ghost" onClick={() => setEditing(null)}>Cancel</button>
+            <button type="button" className="btn btn-primary" disabled={busy || !valid} onClick={save}>{busy ? 'Saving…' : 'Save driver'}</button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
-

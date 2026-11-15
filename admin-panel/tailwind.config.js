@@ -1,63 +1,39 @@
+import { colors, stocks, radius } from '../shared/theme/tokens.js';
+
+const stockColors = Object.fromEntries(
+  Object.entries(stocks).flatMap(([name, s]) => [[`${name}`, s.stock], [`${name}-ink`, s.ink]])
+);
+
 /** @type {import('tailwindcss').Config} */
 export default {
-  darkMode: ["class"],
-  content: [
-    './pages/**/*.{js,jsx}',
-    './components/**/*.{js,jsx}',
-    './app/**/*.{js,jsx}',
-    './src/**/*.{js,jsx}',
-  ],
+  content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
-    container: {
-      center: true,
-      padding: "2rem",
-      screens: {
-        "2xl": "1400px",
-      },
-    },
     extend: {
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
-        },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
-        },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
-        },
-        popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
-        },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
+        ink: { DEFAULT: colors.ink, soft: colors.inkSoft, faint: colors.inkFaint },
+        paper: colors.paper,
+        counterfoil: colors.counterfoil,
+        rule: colors.rule,
+        signal: { DEFAULT: colors.signal, stock: colors.signalStock },
+        ...stockColors
+      },
+      fontFamily: {
+        sans: ['"Anek Latin"', 'system-ui', 'sans-serif']
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        sm: `${radius.sm}px`,
+        md: `${radius.md}px`,
+        lg: `${radius.lg}px`
       },
-    },
+      boxShadow: {
+        rest: '0 1px 0 rgba(22,33,62,.06), 0 2px 6px -2px rgba(22,33,62,.14)',
+        lifted: '0 10px 24px -8px rgba(22,33,62,.28)'
+      },
+      transitionTimingFunction: {
+        out: 'cubic-bezier(0.16, 1, 0.3, 1)',
+        stamp: 'cubic-bezier(0.34, 1.56, 0.64, 1)'
+      }
+    }
   },
-  plugins: [require("tailwindcss-animate")],
-}
-
+  plugins: []
+};

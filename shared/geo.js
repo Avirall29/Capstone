@@ -68,6 +68,19 @@ export function projectOntoPath(index, point, minAlong = 0) {
   return bestAny;
 }
 
+/** The point `along` meters from the start of an indexed path. */
+export function pointAtDistance(index, along) {
+  if (!index) return null;
+  const d = Math.max(0, Math.min(index.total, along));
+  let i = 0;
+  while (i < index.cumulative.length - 2 && index.cumulative[i + 1] < d) i++;
+  const seg = index.cumulative[i + 1] - index.cumulative[i] || 1;
+  const t = (d - index.cumulative[i]) / seg;
+  const a = index.points[i];
+  const b = index.points[i + 1];
+  return { lat: a.lat + (b.lat - a.lat) * t, lng: a.lng + (b.lng - a.lng) * t };
+}
+
 /** Shortest distance (meters) from a point to a path. */
 export function distanceToPath(index, point) {
   return projectOntoPath(index, point)?.offset ?? Infinity;
