@@ -47,6 +47,8 @@ app.use(cors({ origin: allowedOrigins }));
 app.use('/api/auth/driver/register', express.json({ limit: '20mb' }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
+// Express 5 leaves req.body undefined when a request has no body (e.g. POST /drivers/:id/approve).
+app.use((req, res, next) => { req.body ??= {}; next(); });
 
 // Routes
 app.use('/api/auth', authRoutes);

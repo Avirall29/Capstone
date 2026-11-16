@@ -13,7 +13,7 @@ let mongo, mongoose, models, liveTracker, google, seedData, sockets = [];
 const call = async (method, url, body, token, headers = {}) => {
   const res = await fetch(BASE + url, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }), ...headers },
+    headers: { ...(body && { 'Content-Type': 'application/json' }), ...(token && { Authorization: `Bearer ${token}` }), ...headers },
     body: body && JSON.stringify(body)
   });
   const type = res.headers.get('content-type') || '';
@@ -329,7 +329,8 @@ test('full journey: trip, live tracking, incidents, applications, passengers', a
     assert.ok(Buffer.isBuffer(doc.data) && doc.data.length > 0);
     assert.equal((await call('GET', `/drivers/${app._id}/documents/idProof`)).status, 401, 'documents need admin auth');
 
-    assert.equal((await call('POST', `/drivers/${app._id}/approve`, {}, admin)).status, 200);
+    // No body, exactly like the admin panel's Approve button (regression: Express 5 left req.body undefined).
+    assert.equal((await call('POST', `/drivers/${app._id}/approve`, null, admin)).status, 200);
     const status = await call('GET', '/auth/driver/application', null, reg.data.applicationToken);
     assert.equal(status.data.status, 'approved');
     assert.equal((await call('POST', '/auth/driver/login', { email: 'navjot@example.com', password: 'strongpass1' })).status, 200);
