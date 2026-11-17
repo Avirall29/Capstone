@@ -1,15 +1,15 @@
 'use dom';
 // Driver navigation map (MapLibre in an Expo DOM component; a webview on phones).
 // Props are plain data; changing them updates the map in place (no reload / flicker).
-import { useEffect, useRef } from 'react';
-import maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
-import { MAP_STYLE_URL, INDIA_VIEW } from 'transit-shared/mapConfig.js';
+import { useEffect, useRef, useState } from 'react';
+import { MAP_STYLE_URL, INDIA_VIEW, loadMapLibre } from 'transit-shared/mapConfig.js';
 
 const EMPTY = { type: 'FeatureCollection', features: [] };
+let maplibregl; // set by loadMapLibre(); see mapConfig.js for why it isn't imported
 const line = (coordinates) => (coordinates?.length > 1 ? { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates } } : EMPTY);
 
 export default function RouteMap({ path = [], stops = [], nextIndex = 0, position = null, detour = null, ink = '#17633F', stock = '#BFE6CF', night = false, follow = true }) {
+  const [ready, setReady] = useState(false);
   const el = useRef(null);
   const map = useRef(null);
   const loaded = useRef(false);
@@ -37,6 +37,17 @@ export default function RouteMap({ path = [], stops = [], nextIndex = 0, positio
   };
 
   useEffect(() => {
+    let cancelled = false;
+    loadMapLibre().then((lib) => {
+      if (cancelled) return;
+      maplibregl = lib;
+      create();
+      setReady(true);
+    }).catch((e) => console.warn(e.message)); // offline: the map stays a plain background
+    return () => { cancelled = true; map.current?.remove(); map.current = null; loaded.current = false; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function create() {
     const m = new maplibregl.Map({
       container: el.current,
       style: MAP_STYLE_URL,
@@ -70,8 +81,7 @@ export default function RouteMap({ path = [], stops = [], nextIndex = 0, positio
         m.fitBounds(b, { padding: 40, duration: 0 });
       }
     });
-    return () => { m.remove(); loaded.current = false; };
-  }, []);
+  }
 
   useEffect(paint, [path, stops, nextIndex, detour, ink]);
 
@@ -99,7 +109,7 @@ export default function RouteMap({ path = [], stops = [], nextIndex = 0, positio
     };
     glide.current = requestAnimationFrame(step);
     if (follow) m.easeTo({ center: to, zoom: Math.max(m.getZoom(), 15), duration: 900, easing: (x) => 1 - Math.pow(1 - x, 3) });
-  }, [position, follow, stock]);
+  }, [position, follow, stock, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     // absolute: fills the webview on phones, and the parent View on web (where DOM components render inline)

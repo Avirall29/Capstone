@@ -5,15 +5,15 @@
 //   stops:  [{ id, lat, lng, name, color, big }]
 //   me:     { lat, lng } | null       from / to: { lat, lng } | null
 //   fitKey: changes -> fit everything in view
-import { useEffect, useRef } from 'react';
-import maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
-import { MAP_STYLE_URL, INDIA_VIEW } from 'transit-shared/mapConfig.js';
+import { useEffect, useRef, useState } from 'react';
+import { MAP_STYLE_URL, INDIA_VIEW, loadMapLibre } from 'transit-shared/mapConfig.js';
 
 const EMPTY = { type: 'FeatureCollection', features: [] };
 const GLIDE = 1000;
+let maplibregl; // set by loadMapLibre(); see mapConfig.js for why it isn't imported
 
 export default function PassengerMap({ buses = [], lines = [], stops = [], me = null, from = null, to = null, fitKey = '', padding = null, night = false, onBusPress, onStopPress }) {
+  const [ready, setReady] = useState(false);
   const el = useRef(null);
   const map = useRef(null);
   const loaded = useRef(false);
@@ -56,31 +56,38 @@ export default function PassengerMap({ buses = [], lines = [], stops = [], me = 
   };
 
   useEffect(() => {
-    const m = new maplibregl.Map({ container: el.current, style: MAP_STYLE_URL, center: INDIA_VIEW.center, zoom: INDIA_VIEW.zoom, attributionControl: { compact: true } });
-    map.current = m;
-    markers.current = new Map();
-    pins.current = {};
-    m.on('load', () => {
-      m.addSource('lines', { type: 'geojson', data: EMPTY });
-      m.addSource('stops', { type: 'geojson', data: EMPTY });
-      m.addLayer({ id: 'lines-casing', type: 'line', source: 'lines', filter: ['!', ['get', 'dashed']], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#FBFBF8', 'line-width': ['+', ['get', 'width'], 4] } });
-      m.addLayer({ id: 'lines-solid', type: 'line', source: 'lines', filter: ['!', ['get', 'dashed']], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'width'] } });
-      m.addLayer({ id: 'lines-dashed', type: 'line', source: 'lines', filter: ['get', 'dashed'], layout: { 'line-cap': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': 3.5, 'line-dasharray': [0.5, 1.6] } });
-      m.addLayer({ id: 'stops-circle', type: 'circle', source: 'stops', paint: {
-        'circle-radius': ['case', ['get', 'big'], 8, 5.5], 'circle-color': '#FBFBF8',
-        'circle-stroke-color': ['get', 'color'], 'circle-stroke-width': ['case', ['get', 'big'], 3.5, 2.5]
-      } });
-      m.addLayer({ id: 'stops-label', type: 'symbol', source: 'stops', minzoom: 12.5, layout: {
-        'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'text-size': 12.5, 'text-offset': [0, 1.2], 'text-anchor': 'top', 'text-optional': true
-      }, paint: { 'text-color': '#16213E', 'text-halo-color': '#FBFBF8', 'text-halo-width': 1.6 } });
-      m.on('click', 'stops-circle', (e) => onStopPress?.(e.features[0].properties.id));
-      m.on('mouseenter', 'stops-circle', () => { m.getCanvas().style.cursor = 'pointer'; });
-      m.on('mouseleave', 'stops-circle', () => { m.getCanvas().style.cursor = ''; });
-      loaded.current = true;
-      paintLayers();
-      fit();
-    });
-    return () => { m.remove(); loaded.current = false; };
+    let m;
+    let cancelled = false;
+    loadMapLibre().then((lib) => {
+      if (cancelled) return;
+      maplibregl = lib;
+      m = new maplibregl.Map({ container: el.current, style: MAP_STYLE_URL, center: INDIA_VIEW.center, zoom: INDIA_VIEW.zoom, attributionControl: { compact: true } });
+      map.current = m;
+      markers.current = new Map();
+      pins.current = {};
+      m.on('load', () => {
+        m.addSource('lines', { type: 'geojson', data: EMPTY });
+        m.addSource('stops', { type: 'geojson', data: EMPTY });
+        m.addLayer({ id: 'lines-casing', type: 'line', source: 'lines', filter: ['!', ['get', 'dashed']], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#FBFBF8', 'line-width': ['+', ['get', 'width'], 4] } });
+        m.addLayer({ id: 'lines-solid', type: 'line', source: 'lines', filter: ['!', ['get', 'dashed']], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'width'] } });
+        m.addLayer({ id: 'lines-dashed', type: 'line', source: 'lines', filter: ['get', 'dashed'], layout: { 'line-cap': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': 3.5, 'line-dasharray': [0.5, 1.6] } });
+        m.addLayer({ id: 'stops-circle', type: 'circle', source: 'stops', paint: {
+          'circle-radius': ['case', ['get', 'big'], 8, 5.5], 'circle-color': '#FBFBF8',
+          'circle-stroke-color': ['get', 'color'], 'circle-stroke-width': ['case', ['get', 'big'], 3.5, 2.5]
+        } });
+        m.addLayer({ id: 'stops-label', type: 'symbol', source: 'stops', minzoom: 12.5, layout: {
+          'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'text-size': 12.5, 'text-offset': [0, 1.2], 'text-anchor': 'top', 'text-optional': true
+        }, paint: { 'text-color': '#16213E', 'text-halo-color': '#FBFBF8', 'text-halo-width': 1.6 } });
+        m.on('click', 'stops-circle', (e) => onStopPress?.(e.features[0].properties.id));
+        m.on('mouseenter', 'stops-circle', () => { m.getCanvas().style.cursor = 'pointer'; });
+        m.on('mouseleave', 'stops-circle', () => { m.getCanvas().style.cursor = ''; });
+        loaded.current = true;
+        paintLayers();
+        fit();
+      });
+      setReady(true);
+    }).catch((e) => console.warn(e.message)); // offline: the map stays a plain background
+    return () => { cancelled = true; m?.remove(); map.current = null; loaded.current = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(paintLayers, [lines, stops]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -89,6 +96,7 @@ export default function PassengerMap({ buses = [], lines = [], stops = [], me = 
   // Bus markers: ticket-like labels that glide between positions.
   useEffect(() => {
     const m = map.current;
+    if (!m) return;
     const seen = new Set();
     for (const b of buses) {
       if (b.lat == null) continue;
@@ -126,11 +134,12 @@ export default function PassengerMap({ buses = [], lines = [], stops = [], me = 
     for (const [id, entry] of markers.current) {
       if (!seen.has(id)) { cancelAnimationFrame(entry.raf); entry.marker.remove(); markers.current.delete(id); }
     }
-  }, [buses]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [buses, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Me (blue dot) and from/to pins
   useEffect(() => {
     const m = map.current;
+    if (!m) return;
     const place = (key, point, make) => {
       if (!point) { pins.current[key]?.remove(); delete pins.current[key]; return; }
       if (!pins.current[key]) pins.current[key] = new maplibregl.Marker({ element: make(), anchor: key === 'me' ? 'center' : 'bottom' }).setLngLat([point.lng, point.lat]).addTo(m);
@@ -149,7 +158,7 @@ export default function PassengerMap({ buses = [], lines = [], stops = [], me = 
     };
     place('from', from, pin('A', '#16213E'));
     place('to', to, pin('B', '#A3184A'));
-  }, [me, from, to]);
+  }, [me, from, to, ready]);
 
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
