@@ -30,7 +30,9 @@ module.exports = {
       ['expo-build-properties', { android: { usesCleartextTraffic: true } }],
       ...(iosUrlScheme ? [['@react-native-google-signin/google-signin', { iosUrlScheme }]] : [])
     ],
+    // OTA updates reach builds with the same `version`. Bump `version` after native changes.
     runtimeVersion: { policy: 'appVersion' },
+    updates: { url: 'https://u.expo.dev/42311cb6-254a-461d-9566-76b9958a5ba6' },
     owner: 'devansh_korde',
     extra: { eas: { projectId: '42311cb6-254a-461d-9566-76b9958a5ba6' } }
   }
