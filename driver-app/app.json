@@ -28,7 +28,6 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#16213E"
       },
-      "edgeToEdgeEnabled": true,
       "permissions": [
         "CALL_PHONE",
         "VIBRATE"
@@ -79,8 +78,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "a7ee5918-7888-4dca-a931-6b3b10ed557f"
+        "projectId": "62d811d0-b1d9-41c6-a5bc-f0e34e2f7a15"
       }
-    }
+    },
+    "owner": "devansh_korde"
   }
 }
