@@ -1,258 +1,161 @@
-import { useState, useEffect } from 'react';
-import { tripAPI } from '../lib/api';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../components/ui/table';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Button } from '../components/ui/button';
+import { useEffect, useState } from 'react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { colors, stocks } from '@shared/theme/tokens.js';
+import { INCIDENT_TYPES } from '@shared/incidents.js';
+import { tripAPI, errorMessage } from '@/lib/api';
+import { PageHeader } from '@/components/Layout';
+import { RouteBadge, Stamp, EmptyTicket, RuledLines } from '@/components/ticket';
+import { cn } from '@/lib/utils';
 
-export default function Analytics() {
-  const [trips, setTrips] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({
-    startDate: '',
-    endDate: '',
-    status: '',
-  });
+const iso = (d) => d.toISOString().slice(0, 10);
+const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return iso(d); };
+const PRESETS = [['Today', 0], ['7 days', 6], ['30 days', 29], ['90 days', 89]];
 
-  useEffect(() => {
-    fetchTrips();
-  }, []);
+const duration = (t) => {
+  if (!t.endTime) return 'On the road';
+  const m = Math.round((new Date(t.endTime) - new Date(t.startTime)) / 60000);
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
+};
 
-  const fetchTrips = async () => {
-    try {
-      setLoading(true);
-      const params = {};
-      if (filters.startDate) params.startDate = filters.startDate;
-      if (filters.endDate) params.endDate = filters.endDate;
-      if (filters.status) params.status = filters.status;
-
-      const response = await tripAPI.getAll(params);
-      setTrips(response.data);
-    } catch (error) {
-      console.error('Error fetching trips:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleFilterChange = (field, value) => {
-    setFilters({ ...filters, [field]: value });
-  };
-
-  const calculateTripDuration = (startTime, endTime) => {
-    if (!endTime) return 'Ongoing';
-    const duration = new Date(endTime) - new Date(startTime);
-    const hours = Math.floor(duration / (1000 * 60 * 60));
-    const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
-    return `${hours}h ${minutes}m`;
-  };
-
-  const getStats = () => {
-    const completedTrips = trips.filter((t) => t.status === 'completed');
-    const activeTrips = trips.filter((t) => t.status === 'active');
-    const breakdownTrips = trips.filter((t) => t.breakdownReported);
-
-    const totalDuration = completedTrips.reduce((sum, trip) => {
-      if (trip.endTime) {
-        return sum + (new Date(trip.endTime) - new Date(trip.startTime));
-      }
-      return sum;
-    }, 0);
-
-    const avgDuration = completedTrips.length > 0
-      ? totalDuration / completedTrips.length / (1000 * 60)
-      : 0;
-
-    return {
-      total: trips.length,
-      completed: completedTrips.length,
-      active: activeTrips.length,
-      breakdowns: breakdownTrips.length,
-      avgDuration: Math.round(avgDuration),
-    };
-  };
-
-  const stats = getStats();
-
-  if (loading) {
-    return <div>Loading analytics...</div>;
-  }
-
+/** A waybill total line: figures printed side by side, separated by perforations. */
+function Totals({ stats }) {
+  const items = [
+    [stats.total, 'trips'],
+    [stats.completed, 'completed'],
+    [stats.totalDistanceKm, 'km driven'],
+    [stats.avgDurationMinutes, 'min average trip'],
+    [stats.onTimePercent != null ? `${stats.onTimePercent}%` : '—', 'on time (≤ 5 min late)'],
+    [stats.breakdowns, 'breakdowns']
+  ];
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Trip History & Analytics</h1>
-        <p className="text-gray-600 mt-2">View and analyze trip data</p>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Trips</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.completed}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.active}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Breakdowns</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.breakdowns}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="startDate">Start Date</Label>
-              <Input
-                id="startDate"
-                type="date"
-                value={filters.startDate}
-                onChange={(e) => handleFilterChange('startDate', e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="endDate">End Date</Label>
-              <Input
-                id="endDate"
-                type="date"
-                value={filters.endDate}
-                onChange={(e) => handleFilterChange('endDate', e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <select
-                id="status"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={filters.status}
-                onChange={(e) => handleFilterChange('status', e.target.value)}
-              >
-                <option value="">All</option>
-                <option value="active">Active</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </div>
-            <div className="space-y-2 flex items-end">
-              <Button onClick={fetchTrips} className="w-full">
-                Apply Filters
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Trips Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Trip History</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Bus</TableHead>
-                <TableHead>Driver</TableHead>
-                <TableHead>Start Time</TableHead>
-                <TableHead>End Time</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Breakdown</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {trips.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-gray-500">
-                    No trips found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                trips.map((trip) => (
-                  <TableRow key={trip._id}>
-                    <TableCell>
-                      {trip.bus?.busNumber} - {trip.bus?.route}
-                    </TableCell>
-                    <TableCell>{trip.driver?.name}</TableCell>
-                    <TableCell>
-                      {new Date(trip.startTime).toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      {trip.endTime
-                        ? new Date(trip.endTime).toLocaleString()
-                        : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {calculateTripDuration(trip.startTime, trip.endTime)}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          trip.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : trip.status === 'completed'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {trip.status}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {trip.breakdownReported ? (
-                        <span className="text-red-600 font-medium">
-                          Yes - {trip.breakdownReason}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">No</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+    <div className="ticket flex flex-wrap">
+      {items.map(([n, label], i) => (
+        <div key={label} className={cn('flex-1 min-w-[150px] px-5 py-4', i > 0 && 'border-l-2 border-dotted border-rule')}>
+          <div className="num text-[34px]">{n}</div>
+          <div className="text-[13.5px] text-ink-soft mt-1">{label}</div>
+        </div>
+      ))}
     </div>
   );
 }
 
+export default function Analytics() {
+  const [range, setRange] = useState({ startDate: daysAgo(6), endDate: iso(new Date()) });
+  const [stats, setStats] = useState(null);
+  const [trips, setTrips] = useState(null);
+  const [page, setPage] = useState(1);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setStats(null);
+    tripAPI.stats(range).then((r) => setStats(r.data)).catch((e) => setError(errorMessage(e)));
+  }, [range]);
+  useEffect(() => {
+    setTrips(null);
+    tripAPI.list({ ...range, page, limit: 20 }).then((r) => setTrips(r.data)).catch((e) => setError(errorMessage(e)));
+  }, [range, page]);
+
+  const setPreset = (n) => { setPage(1); setRange({ startDate: daysAgo(n), endDate: iso(new Date()) }); };
+  const activePreset = PRESETS.find(([, n]) => range.startDate === daysAgo(n) && range.endDate === iso(new Date()))?.[1];
+  const incidents = stats ? Object.entries(stats.incidentsByType) : [];
+  const maxIncidents = Math.max(1, ...incidents.map(([, n]) => n));
+
+  return (
+    <div className="space-y-10">
+      <PageHeader title="Reports" actions={
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex gap-1 p-1 rounded-md bg-rule/40">
+            {PRESETS.map(([label, n]) => (
+              <button key={label} type="button" onClick={() => setPreset(n)}
+                className={cn('h-9 px-3 rounded-sm text-[14px] font-semibold', activePreset === n ? 'bg-counterfoil shadow-rest' : 'text-ink-soft hover:text-ink')}>{label}</button>
+            ))}
+          </div>
+          <input type="date" className="field h-11 w-[150px]" value={range.startDate} max={range.endDate} aria-label="From date"
+            onChange={(e) => { setPage(1); setRange({ ...range, startDate: e.target.value }); }} />
+          <input type="date" className="field h-11 w-[150px]" value={range.endDate} min={range.startDate} aria-label="To date"
+            onChange={(e) => { setPage(1); setRange({ ...range, endDate: e.target.value }); }} />
+        </div>
+      }>
+        Trips, distance, punctuality and incidents for the selected dates.
+      </PageHeader>
+
+      {error && <p role="alert" className="p-3 rounded-md bg-signal-stock text-signal">{error}</p>}
+      {!stats ? <RuledLines rows={3} /> : <Totals stats={stats} />}
+
+      <div className="grid xl:grid-cols-[2fr_1fr] gap-8">
+        <section className="ticket p-5">
+          <h2 className="font-bold text-[18px] mb-4">Trips per day</h2>
+          {!stats ? <RuledLines rows={5} /> : stats.perDay.length === 0 ? <p className="text-ink-soft">No trips in this period.</p> : (
+            <div className="h-[260px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats.perDay} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
+                  <CartesianGrid vertical={false} stroke={colors.rule} strokeDasharray="2 4" />
+                  <XAxis dataKey="date" tickFormatter={(d) => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} tick={{ fill: colors.inkFaint, fontSize: 12 }} axisLine={{ stroke: colors.ink }} tickLine={false} />
+                  <YAxis allowDecimals={false} tick={{ fill: colors.inkFaint, fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <Tooltip cursor={{ fill: 'rgba(22,33,62,.05)' }} contentStyle={{ background: colors.counterfoil, border: `1px solid ${colors.rule}`, borderRadius: 8, fontFamily: 'Anek Latin' }}
+                    formatter={(v, name) => [v, name === 'trips' ? 'Trips' : name]} labelFormatter={(d) => new Date(d).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })} />
+                  <Bar dataKey="trips" fill={colors.ink} radius={[3, 3, 0, 0]} maxBarSize={36} animationDuration={600} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </section>
+
+        <section className="ticket p-5">
+          <h2 className="font-bold text-[18px] mb-4">Incidents</h2>
+          {!stats ? <RuledLines rows={4} /> : incidents.length === 0 ? <p className="text-ink-soft">No incidents in this period.</p> : (
+            <ul className="space-y-3">
+              {incidents.sort((a, b) => b[1] - a[1]).map(([type, n]) => (
+                <li key={type}>
+                  <div className="flex justify-between text-[14px] mb-1"><span>{INCIDENT_TYPES[type] || type}</span><span className="num text-[18px]">{n}</span></div>
+                  <div className="h-2.5 rounded-sm bg-paper overflow-hidden">
+                    <div className="h-full rounded-sm transition-[width] duration-700 ease-out" style={{ width: `${(n / maxIncidents) * 100}%`, background: type === 'panic' ? colors.signal : stocks.buff.ink }} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+
+      <section>
+        <h2 className="font-bold text-[20px] mb-4">Trip register</h2>
+        {!trips ? <RuledLines rows={8} /> : trips.items.length === 0 ? (
+          <EmptyTicket title="No trips in this period">Trips are recorded when drivers start and end them in the driver app.</EmptyTicket>
+        ) : (
+          <>
+            <div className="ticket overflow-x-auto">
+              <table className="waybill">
+                <thead><tr><th>Started</th><th>Route</th><th>Bus</th><th>Driver</th><th>Duration</th><th className="text-right">Distance</th><th className="text-right">Delay</th><th>Notes</th></tr></thead>
+                <tbody>
+                  {trips.items.map((t) => (
+                    <tr key={t._id}>
+                      <td className="whitespace-nowrap tabular-nums">{new Date(t.startTime).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+                      <td>{t.route ? <RouteBadge route={t.route} size="sm" /> : '—'}</td>
+                      <td>Bus {t.bus?.busNumber || '—'}</td>
+                      <td>{t.driver?.name || '—'}</td>
+                      <td className="whitespace-nowrap">{t.status === 'active' ? <Stamp kind="live">On the road</Stamp> : duration(t)}</td>
+                      <td className="text-right tabular-nums">{(t.totalDistance / 1000).toFixed(1)} km</td>
+                      <td className="text-right tabular-nums">{t.scheduledDeparture ? `${t.delayMinutes > 0 ? '+' : ''}${t.delayMinutes} min` : '—'}</td>
+                      <td>
+                        {t.breakdownReported && <Stamp kind="breakdown">Breakdown</Stamp>}
+                        {t.locationWarnings > 0 && <span className="text-[13px] text-ink-soft ml-2">{t.locationWarnings} location warning{t.locationWarnings > 1 ? 's' : ''}</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex items-center justify-between mt-4 text-[14px]">
+              <span className="text-ink-soft">{trips.total} trips · page {trips.page} of {trips.pages}</span>
+              <div className="flex gap-2">
+                <button type="button" className="btn btn-sm btn-secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button>
+                <button type="button" className="btn btn-sm btn-secondary" disabled={page >= trips.pages} onClick={() => setPage(page + 1)}>Next</button>
+              </div>
+            </div>
+          </>
+        )}
+      </section>
+    </div>
+  );
+}

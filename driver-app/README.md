@@ -1,37 +1,32 @@
-# Driver App - Transport Tracking System
+# Bus Driver app (Expo SDK 58)
 
-React Native (Expo) mobile app for drivers to track their trips and send GPS locations.
+What drivers use on the road: sign in or apply to drive, start/end trips, live next-stop ETA,
+navigation with automatic re-routing, breakdown reports, SOS, and location-off warnings.
 
-## Quick Start
+## Run
 
-1. Install dependencies:
 ```bash
 npm install
+cp .env.example .env          # set EXPO_PUBLIC_API_URL
+npx expo start                # press "a" for Android
 ```
 
-2. Update API URL in `utils/api.js`:
-```javascript
-const API_BASE_URL = 'http://YOUR_IP_ADDRESS:5000/api';
-```
+Background location, push notifications and the native map webview need a **development build**
+(Expo Go can't run them all):
 
-3. Add required assets (icon.png, splash.png, etc.) to `assets/` folder
-
-4. Start Expo:
 ```bash
-npm start
-# or
-expo start
+npx eas-cli@latest build --profile development --platform android
 ```
 
-5. Run on device/emulator:
-- Press `a` for Android
-- Press `i` for iOS
-- Scan QR code for physical device
+For a quick look without a phone: `npx expo start --web` (tracking features are limited on web).
 
-## Important Notes
+Demo accounts (with `npm run demo` in `../backend`): `demo.driver1@transit.local` … `demo.driver4@transit.local`, password `Demo@1234`.
 
-- Update API_BASE_URL for your network setup
-- Grant location permissions when prompted
-- Background location tracking requires proper permissions
-- For physical devices, use your computer's IP address instead of localhost
+## How it works
 
+- `src/app/` — screens (Expo Router): `login`, `register` (4-step application with document photos), `application` (review status), `home` (cockpit), `settings` (language, sign out).
+- `src/lib/tracking.js` — background location task, foreground sending, offline queue (points are queued on the phone without signal and sent in order via `/locations/batch`).
+- `src/lib/hooks.js` — trip loop, **location-off warnings** (15 s → warning, 2 warnings → depot notified; rules in `../shared/locationWarnings.js`), **re-routing** (off the route for 3 fixes → road directions back to the next stops).
+- `src/components/RouteMap.js` — MapLibre map as an Expo DOM component (OpenFreeMap tiles).
+- Shared code (`../shared`) is imported as `transit-shared/...` (see `metro.config.js`).
+- Night stock: the app follows the phone's dark mode.

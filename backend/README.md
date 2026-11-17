@@ -19,9 +19,9 @@ NODE_ENV=development
 
 3. Start MongoDB (if not running)
 
-4. Create default admin (optional):
+4. Create an admin (see `../CREATE_ADMIN.md`):
 ```bash
-curl -X POST http://localhost:5000/api/auth/admin/create-default
+node create-admin.js you@example.com "a-strong-password"
 ```
 
 5. Start server:
@@ -29,10 +29,9 @@ curl -X POST http://localhost:5000/api/auth/admin/create-default
 npm run dev
 ```
 
-## Default Admin Credentials
+## Environment
 
-- Email: `admin@transport.com`
-- Password: `admin123`
+Set `CORS_ORIGINS` (comma-separated) to the web origins allowed to call the API, e.g. the deployed admin panel URL. Defaults to `http://localhost:3000,http://localhost:3001`.
 
 ## API Documentation
 

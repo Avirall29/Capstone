@@ -1,28 +1,25 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || API_BASE_URL.replace(/\/api\/?$/, '');
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Add token to requests
+export const getToken = () => localStorage.getItem('token');
+
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  const token = getToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// Handle auth errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !error.config?.url?.includes('/auth/admin/login')) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
@@ -31,16 +28,20 @@ api.interceptors.response.use(
   }
 );
 
-// Auth
+/** Human-readable message from an API error. */
+export const errorMessage = (error, fallback = 'Something went wrong. Try again.') =>
+  error?.response?.data?.message || (error?.message === 'Network Error' ? 'Cannot reach the server.' : fallback);
+
 export const authAPI = {
   login: (email, password) => api.post('/auth/admin/login', { email, password }),
-  createDefaultAdmin: () => api.post('/auth/admin/create-default'),
 };
 
-// Buses
+export const adminAPI = {
+  summary: () => api.get('/admin/summary'),
+};
+
 export const busAPI = {
   getAll: () => api.get('/buses'),
-  getById: (id) => api.get(`/buses/${id}`),
   create: (data) => api.post('/buses', data),
   update: (id, data) => api.put(`/buses/${id}`, data),
   delete: (id) => api.delete(`/buses/${id}`),
@@ -48,27 +49,49 @@ export const busAPI = {
   getActive: () => api.get('/buses/active/all'),
 };
 
-// Drivers
 export const driverAPI = {
   getAll: () => api.get('/drivers'),
-  getById: (id) => api.get(`/drivers/${id}`),
   create: (data) => api.post('/drivers', data),
   update: (id, data) => api.put(`/drivers/${id}`, data),
   delete: (id) => api.delete(`/drivers/${id}`),
+  applications: (status) => api.get('/drivers/applications', { params: { status } }),
+  approve: (id) => api.post(`/drivers/${id}/approve`),
+  reject: (id, reason) => api.post(`/drivers/${id}/reject`, { reason }),
+  document: (id, kind) => api.get(`/drivers/${id}/documents/${kind}`, { responseType: 'blob' }),
 };
 
-// Trips
 export const tripAPI = {
-  getAll: (params) => api.get('/trips', { params }),
-  getById: (id) => api.get(`/trips/${id}`),
+  list: (params) => api.get('/trips', { params }),
+  stats: (params) => api.get('/trips/stats', { params }),
   getActive: () => api.get('/trips/active/all'),
 };
 
-// Locations
 export const locationAPI = {
-  getByTrip: (tripId, limit = 1000) => api.get(`/locations/trip/${tripId}`, { params: { limit } }),
-  getByBus: (busId, limit = 100) => api.get(`/locations/bus/${busId}`, { params: { limit } }),
+  byTrip: (tripId) => api.get(`/locations/trip/${tripId}`),
+};
+
+export const incidentAPI = {
+  list: (params) => api.get('/incidents', { params }),
+  get: (id) => api.get(`/incidents/${id}`),
+  acknowledge: (id) => api.post(`/incidents/${id}/acknowledge`),
+  resolve: (id, resolution, note) => api.post(`/incidents/${id}/resolve`, { resolution, note }),
+};
+
+export const transitAPI = {
+  stops: () => api.get('/transit/stops'),
+  createStop: (data) => api.post('/transit/stops', data),
+  updateStop: (id, data) => api.put(`/transit/stops/${id}`, data),
+  deleteStop: (id) => api.delete(`/transit/stops/${id}`),
+  routes: () => api.get('/transit/routes'),
+  route: (id) => api.get(`/transit/routes/${id}`),
+  createRoute: (data) => api.post('/transit/routes', data),
+  updateRoute: (id, data) => api.put(`/transit/routes/${id}`, data),
+  deleteRoute: (id) => api.delete(`/transit/routes/${id}`),
+  generatePath: (id) => api.post(`/transit/routes/${id}/generate-path`, {}),
+};
+
+export const publicAPI = {
+  route: (id) => api.get(`/public/routes/${id}`),
 };
 
 export default api;
-

@@ -1,33 +1,28 @@
-import axios from 'axios';
+// Create an admin, or reset an existing admin's password.
+// Usage: node create-admin.js <email> <password>
+// Uses MONGODB_URI from .env (point it at the production DB to manage the deployed admin).
+import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+import Admin from './models/Admin.js';
 
-const API_URL = 'http://localhost:5000/api/auth/admin/create-default';
+dotenv.config();
 
-console.log('Creating default admin account...');
-console.log('Make sure the backend server is running on port 5000\n');
+const [email, password] = process.argv.slice(2);
+if (!email || !password || password.length < 8) {
+  console.error('Usage: node create-admin.js <email> <password>   (password: min 8 characters)');
+  process.exit(1);
+}
 
-axios.post(API_URL)
-  .then(response => {
-    console.log('✅ Success!');
-    console.log('Response:', response.data);
-    console.log('\nYou can now login with:');
-    console.log('Email: admin@transport.com');
-    console.log('Password: admin123');
-  })
-  .catch(error => {
-    if (error.response) {
-      console.error('❌ Error:', error.response.data.message || error.response.data);
-      if (error.response.data.message === 'Default admin already exists') {
-        console.log('\n✅ Admin already exists! You can login with:');
-        console.log('Email: admin@transport.com');
-        console.log('Password: admin123');
-      }
-    } else if (error.code === 'ECONNREFUSED') {
-      console.error('❌ Cannot connect to server!');
-      console.error('Make sure the backend is running:');
-      console.error('  cd backend');
-      console.error('  npm run dev');
-    } else {
-      console.error('❌ Error:', error.message);
-    }
-  });
+await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/transport_tracking');
 
+const existing = await Admin.findOne({ email: email.toLowerCase() });
+if (existing) {
+  existing.password = password; // re-hashed by the pre-save hook
+  await existing.save();
+  console.log(`Password reset for admin ${existing.email}`);
+} else {
+  const admin = await Admin.create({ username: email.toLowerCase(), email, password });
+  console.log(`Admin created: ${admin.email}`);
+}
+
+await mongoose.disconnect();

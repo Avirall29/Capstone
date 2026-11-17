@@ -1,0 +1,58 @@
+// Slide-to-confirm for starting/ending trips: hard to trigger by accident in a moving cab.
+import { useRef, useState } from 'react';
+import { ActivityIndicator, Animated, PanResponder, StyleSheet, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
+import T from 'transit-shared/native/T';
+import { useTheme } from 'transit-shared/native/theme';
+
+const KNOB = 56;
+
+export default function SlideToConfirm({ label, onConfirm, tone = 'primary', loading }) {
+  const theme = useTheme();
+  const [width, setWidth] = useState(0);
+  const x = useRef(new Animated.Value(0)).current;
+  const max = Math.max(0, width - KNOB - 8);
+  const bg = tone === 'danger' ? theme.signal : theme.primary;
+  const fg = tone === 'danger' ? '#FBFBF8' : theme.onPrimary;
+
+  const responder = useRef(null);
+  responder.current = PanResponder.create({
+    onStartShouldSetPanResponder: () => !loading,
+    onMoveShouldSetPanResponder: () => !loading,
+    onPanResponderMove: (_, g) => x.setValue(Math.max(0, Math.min(max, g.dx))),
+    onPanResponderRelease: (_, g) => {
+      if (g.dx >= max * 0.85) {
+        Animated.timing(x, { toValue: max, duration: 120, useNativeDriver: false }).start();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        Promise.resolve(onConfirm()).finally(() => Animated.spring(x, { toValue: 0, useNativeDriver: false }).start());
+      } else {
+        Animated.spring(x, { toValue: 0, useNativeDriver: false, bounciness: 6 }).start();
+      }
+    }
+  });
+
+  return (
+    <View
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      style={[styles.track, { backgroundColor: bg }]}
+      accessibilityRole="adjustable"
+      accessibilityLabel={label}
+      accessibilityActions={[{ name: 'activate' }]}
+      onAccessibilityAction={() => onConfirm()}
+    >
+      <Animated.View style={[StyleSheet.absoluteFill, styles.labelWrap, { opacity: x.interpolate({ inputRange: [0, Math.max(1, max)], outputRange: [1, 0.15] }) }]}>
+        <T variant="bodyStrong" color={fg} style={{ fontSize: 17 }}>{label}</T>
+      </Animated.View>
+      <Animated.View {...responder.current.panHandlers} style={[styles.knob, { backgroundColor: fg, transform: [{ translateX: x }] }]}>
+        {loading ? <ActivityIndicator color={bg} /> : <Ionicons name="chevron-forward" size={28} color={bg} />}
+      </Animated.View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  track: { height: KNOB + 8, borderRadius: 10, padding: 4, justifyContent: 'center' },
+  labelWrap: { alignItems: 'center', justifyContent: 'center', paddingLeft: KNOB },
+  knob: { width: KNOB, height: KNOB, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }
+});

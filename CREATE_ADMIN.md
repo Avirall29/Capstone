@@ -1,102 +1,25 @@
-# How to Create Default Admin Account
+# How to Create an Admin Account
 
-The default admin account needs to be created before you can login. Follow these steps:
+Admins are created from the command line. There is no public HTTP endpoint for this (it would let anyone become admin).
 
-## Step 1: Start the Backend Server
-
-Make sure the backend is running:
+## Create an admin (or reset an admin's password)
 
 ```bash
 cd backend
-npm run dev
+npm install
+node create-admin.js you@example.com "a-strong-password"
 ```
 
-You should see: `Server running on port 5000`
+- Password must be at least 8 characters.
+- If the email already belongs to an admin, the script resets that admin's password instead.
+- The script uses `MONGODB_URI` from `backend/.env` (defaults to local MongoDB). To manage the **deployed** admin, temporarily set `MONGODB_URI` to the production database.
 
-## Step 2: Create Default Admin
+## Login
 
-### Option 1: Using Browser (Easiest)
-
-1. Open your browser
-2. Go to: `http://localhost:5000/api/auth/admin/create-default`
-3. You'll see an error (because it's a POST request, not GET)
-4. Use one of the methods below instead
-
-### Option 2: Using curl (Command Line)
-
-**Windows (PowerShell):**
-```powershell
-Invoke-WebRequest -Uri http://localhost:5000/api/auth/admin/create-default -Method POST
-```
-
-**Windows (Command Prompt):**
-```cmd
-curl -X POST http://localhost:5000/api/auth/admin/create-default
-```
-
-**Mac/Linux:**
-```bash
-curl -X POST http://localhost:5000/api/auth/admin/create-default
-```
-
-### Option 3: Using Postman or Similar Tool
-
-1. Open Postman (or similar API tool)
-2. Create a new POST request
-3. URL: `http://localhost:5000/api/auth/admin/create-default`
-4. Click Send
-
-### Option 4: Using Node.js Script
-
-Create a file `create-admin.js` in the backend folder:
-
-```javascript
-import axios from 'axios';
-
-axios.post('http://localhost:5000/api/auth/admin/create-default')
-  .then(response => {
-    console.log('Success:', response.data);
-  })
-  .catch(error => {
-    console.error('Error:', error.response?.data || error.message);
-  });
-```
-
-Then run: `node create-admin.js`
-
-## Step 3: Verify Success
-
-You should see a response like:
-```json
-{
-  "message": "Default admin created successfully",
-  "email": "admin@transport.com",
-  "password": "admin123"
-}
-```
-
-## Step 4: Login
-
-Now you can login to the admin panel:
-- URL: http://localhost:3000
-- Email: `admin@transport.com`
-- Password: `admin123`
+Open the admin panel (http://localhost:3000 locally) and sign in with the email and password you chose.
 
 ## Troubleshooting
 
-### Error: "Default admin already exists"
-- This means the admin is already created
-- Try logging in with the credentials above
-- If login still fails, check MongoDB connection
-
-### Error: "Cannot connect to server"
-- Make sure backend is running on port 5000
-- Check if MongoDB is running
-- Verify the URL is correct
-
-### Still can't login after creating admin
-- Check browser console for errors
-- Verify backend is running
-- Check MongoDB connection in backend logs
-- Try clearing browser cache/cookies
-
+- **Connection error**: check that MongoDB is running and `MONGODB_URI` is correct.
+- **"Invalid credentials"**: re-run the script with the same email to reset the password.
+- **"Too many login attempts"**: logins are limited to 10 tries per 15 minutes; wait and retry.

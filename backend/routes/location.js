@@ -1,116 +1,86 @@
 import express from 'express';
-import { body, validationResult } from 'express-validator';
-import { authenticateDriver, authenticateAdmin } from '../middleware/auth.js';
+import { body } from 'express-validator';
+import { authenticateAdmin, verifyToken } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
 import Location from '../models/Location.js';
-import Trip from '../models/Trip.js';
-import Bus from '../models/Bus.js';
+import * as liveTracker from '../services/liveTracker.js';
 
 const router = express.Router();
 
-// Send location update (Driver)
-router.post('/', authenticateDriver, [
-  body('coordinates.lat').isFloat(),
-  body('coordinates.lng').isFloat(),
-  body('tripId').notEmpty()
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { coordinates, tripId, speed, heading } = req.body;
-    const driver = req.user;
-
-    // Verify trip belongs to driver
-    const trip = await Trip.findById(tripId);
-    if (!trip) {
-      return res.status(404).json({ message: 'Trip not found' });
-    }
-
-    if (trip.driver.toString() !== driver._id.toString()) {
-      return res.status(403).json({ message: 'Unauthorized' });
-    }
-
-    if (trip.status !== 'active') {
-      return res.status(400).json({ message: 'Trip is not active' });
-    }
-
-    // Save location
-    const location = new Location({
-      trip: tripId,
-      bus: trip.bus,
-      driver: driver._id,
-      coordinates: {
-        lat: coordinates.lat,
-        lng: coordinates.lng
-      },
-      speed: speed || 0,
-      heading: heading || 0
-    });
-
-    await location.save();
-
-    // Update bus current location
-    const bus = await Bus.findById(trip.bus);
-    if (bus) {
-      bus.currentLocation = {
-        lat: coordinates.lat,
-        lng: coordinates.lng,
-        timestamp: new Date()
-      };
-      await bus.save();
-    }
-
-    // Emit WebSocket event
-    const io = req.app.get('io');
-    io.to(`bus-${trip.bus}`).emit('location-update', {
-      busId: trip.bus,
-      location: {
-        lat: coordinates.lat,
-        lng: coordinates.lng,
-        timestamp: new Date()
-      },
-      speed: speed || 0,
-      heading: heading || 0
-    });
-
-    res.status(201).json({ message: 'Location updated', location });
-  } catch (error) {
-    console.error('Location update error:', error);
-    res.status(500).json({ message: 'Server error' });
+/**
+ * Driver auth for GPS pings without a DB read: the JWT is verified cryptographically and the
+ * driver's active trip comes from the live tracker cache (which evicts suspended drivers).
+ */
+const driverTrip = async (req, res, next) => {
+  const auth = verifyToken(req.header('Authorization')?.replace('Bearer ', ''));
+  if (auth?.role !== 'driver') return res.status(401).json({ message: 'Unauthorized' });
+  const state = await liveTracker.getActiveTrip(auth.userId);
+  if (!state) return res.status(400).json({ message: 'No active trip' });
+  if (req.body.tripId && req.body.tripId !== state.tripId) {
+    return res.status(400).json({ message: 'Trip is not active' });
   }
+  req.tripState = state;
+  next();
+};
+
+const point = (prefix) => [
+  body(`${prefix}lat`).isFloat({ min: -90, max: 90 }),
+  body(`${prefix}lng`).isFloat({ min: -180, max: 180 }),
+  body(`${prefix}speed`).optional().isFloat(),
+  body(`${prefix}heading`).optional().isFloat()
+];
+
+// Live location update (Driver)
+router.post('/', point('coordinates.'), validate, driverTrip, async (req, res) => {
+  const { coordinates, speed, heading } = req.body;
+  const view = await liveTracker.recordPing(req.tripState, {
+    lat: Number(coordinates.lat),
+    lng: Number(coordinates.lng),
+    speed: Number(speed) || 0,
+    heading: Number(heading) || 0
+  });
+  res.status(201).json({ message: 'Location updated', bus: view });
 });
 
-// Get location history for a trip (Admin)
+/**
+ * Points queued on the phone while offline, oldest first.
+ * They go to history/distance; only a point newer than the last live one (and < 30 s old) goes live.
+ */
+router.post('/batch', [
+  body('points').isArray({ min: 1, max: 500 }),
+  ...point('points.*.'),
+  body('points.*.timestamp').isISO8601()
+], validate, driverTrip, async (req, res) => {
+  const points = [...req.body.points].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const now = Date.now();
+  for (const p of points) {
+    const ts = new Date(p.timestamp).getTime();
+    if (ts > now + 60000) continue; // clock skew garbage
+    await liveTracker.recordPing(req.tripState, {
+      lat: Number(p.lat), lng: Number(p.lng), speed: Number(p.speed) || 0, heading: Number(p.heading) || 0, timestamp: ts
+    }, { live: now - ts < 30000 });
+  }
+  res.status(201).json({ message: 'Locations recorded', count: points.length });
+});
+
+// Location history for a trip (Admin), oldest first for drawing the trail
 router.get('/trip/:tripId', authenticateAdmin, async (req, res) => {
-  try {
-    const { limit = 1000 } = req.query;
-    const locations = await Location.find({ trip: req.params.tripId })
-      .sort({ timestamp: -1 })
-      .limit(parseInt(limit));
-
-    res.json(locations);
-  } catch (error) {
-    console.error('Get location history error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
+  const limit = Math.min(5000, parseInt(req.query.limit) || 2000);
+  const locations = await Location.find({ 'meta.trip': req.params.tripId })
+    .sort({ timestamp: 1 })
+    .limit(limit)
+    .lean();
+  res.json(locations);
 });
 
-// Get recent locations for a bus (Admin)
+// Recent history for a bus (Admin)
 router.get('/bus/:busId', authenticateAdmin, async (req, res) => {
-  try {
-    const { limit = 100 } = req.query;
-    const locations = await Location.find({ bus: req.params.busId })
-      .sort({ timestamp: -1 })
-      .limit(parseInt(limit));
-
-    res.json(locations);
-  } catch (error) {
-    console.error('Get bus locations error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
+  const limit = Math.min(1000, parseInt(req.query.limit) || 100);
+  const locations = await Location.find({ 'meta.bus': req.params.busId })
+    .sort({ timestamp: -1 })
+    .limit(limit)
+    .lean();
+  res.json(locations);
 });
 
 export default router;
-
