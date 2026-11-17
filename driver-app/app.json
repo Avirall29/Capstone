@@ -7,11 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#16213E"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.transport.driver",
@@ -71,7 +66,15 @@
           }
         }
       ],
-      "expo-splash-screen"
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#16213E"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false

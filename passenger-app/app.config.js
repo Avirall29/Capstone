@@ -11,7 +11,6 @@ module.exports = {
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'automatic',
-    splash: { image: './assets/splash-icon.png', resizeMode: 'contain', backgroundColor: '#16213E' },
     ios: { supportsTablet: true, bundleIdentifier: 'com.transport.usertracker' },
     android: {
       package: 'com.transport.usertracker',
@@ -23,7 +22,7 @@ module.exports = {
       'expo-router',
       'expo-font',
       'expo-localization',
-      'expo-splash-screen',
+      ['expo-splash-screen', { image: './assets/splash-icon.png', imageWidth: 200, resizeMode: 'contain', backgroundColor: '#16213E' }],
       ['expo-location', {
         locationWhenInUsePermission: 'City Bus Tracker uses your location to find the nearest bus stop and the best bus for your trip.'
       }],
